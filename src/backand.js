@@ -24,7 +24,6 @@
                 };
                 config.tokenName = 'backand_token';
                 config.token = null;
-
             };
 
             var globalConfiguration = {};
@@ -91,6 +90,15 @@
                         $cookieStore.remove(config.tokenName);
                     }
 
+                    function reloadTokenFromCookies() {
+                        config.token = token.get();
+                        if (config.token) {
+                            setDefaultHeader(config.token);                            
+                        }
+                        else {
+                            clearDefaultHeader();
+                        }
+                    }
 
                     function setDefaultHeader(token){
                         var t = token || $cookieStore.get(config.tokenName);
@@ -99,9 +107,16 @@
                         }
                     }
 
+                    function clearDefaultHeader() {
+                        if ($http.defaults.headers.common['Authorization']) {
+                            delete $http.defaults.headers.common['Authorization'];
+                        }
+                    }
+
                     function signout() {
                         var deferred = $q.defer();
                         token.remove();
+                        clearDefaultHeader(config.token);                        
                         deferred.resolve(true);
                         deferred.promise;
 
@@ -154,6 +169,7 @@
                     service.forgotPassword = forgotPassword;
                     service.resetPassword = resetPassword;
                     service.token = token;
+                    reloadTokenFromCookies();
 
                     return service;
                 }
