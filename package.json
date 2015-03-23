@@ -1,0 +1,10 @@
+{
+  "name": "backand",
+  "version": "1.5.1",
+  "devDependencies": {
+    "grunt": "latest",
+    "grunt-contrib-uglify": "latest",
+    "grunt-contrib-concat": "latest",
+	"grunt-cli": "latest"
+  }
+}
