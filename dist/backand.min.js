@@ -1,6 +1,6 @@
 /*
 * Angular SDK to use with backand 
-* @version 1.5.1 - 2015-03-22
+* @version 1.5.1 - 2015-05-20
 * @link https://backand.com 
 * @author Itay Herskovits 
 * @license MIT License, http://www.opensource.org/licenses/MIT
