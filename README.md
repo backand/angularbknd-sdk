@@ -20,12 +20,12 @@ To upgrade version:
   * major releases for changes in the API signature
 <li>Update the package.json version</li>
 <li>Commit your changes
-`git commit -am "Made some awesome new changes, now its even awesomer"`
+<p>`git commit -am "Made some awesome new changes, now its even awesomer"`<p>
 </li>
 <li>Tag the commit
-`git tag -a v0.0.2 -m "Release version 0.0.2"`
+<p>`git tag -a v0.0.2 -m "Release version 0.0.2"`</p>
 </li>
 <li>Push to GitHub
-`git push origin master --tags`
+<p>`git push origin master --tags`</p>
 </li>
 </ol>
