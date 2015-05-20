@@ -8,7 +8,7 @@ Install:
 Build:
 `grunt`
 
-Register on bower (only once at first time - done):
+Register on bower (only once at first time - done):  
 `bower register angularbknd-sdk https://github.com/backand/angularbknd-sdk.git`
 
 To upgrade version:
