@@ -18,12 +18,8 @@ To upgrade version:
   * Check dependencies versions, if need to be upgraded
   * minor releases for bug fixes
   * major releases for changes in the API signature
-   
 3. Update the package.json version
-4. commit your changes
-`git commit -am "Made some awesome new changes, now its even awesomer"`
-5. tag the commit
-`git tag -a v0.0.2 -m "Release version 0.0.2"`
-6. push to GitHub
-`git push origin master --tags `
-
+4. Run grunt - build the min files
+5. Commit your changes `git commit -am "Made some awesome new changes, now its even awesomer"`
+6. Tag the commit `git tag -a v0.0.2 -m "Release version 0.0.2"`
+7. Push to GitHub `git push origin master --tags`
