@@ -195,15 +195,15 @@
                 }
             }
         })
-        .run(function($injector) {
-            $injector.invoke(function($http, $cookieStore) {
+        .run(['$injector', function($injector) {
+            $injector.invoke(['$http', '$cookieStore', function($http,$cookieStore) {
                 // Cannot inject cookieStore and http to provider, so doing it here:
                 cookieStore = $cookieStore;
                 http = $http;
-            });
+            }]);
             // On load - set default headers from cookie (if managing default headers)
             defaultHeaders.set();
-        });
+        }]);
 
 
     angular.module('backand.utils', [])

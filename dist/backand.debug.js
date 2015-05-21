@@ -1,6 +1,6 @@
 /*
 * Angular SDK to use with backand 
-* @version 1.6.0 - 2015-05-20
+* @version 1.6.0 - 2015-05-21
 * @link https://backand.com 
 * @author Itay Herskovits 
 * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -202,15 +202,15 @@
                 }
             }
         })
-        .run(function($injector) {
-            $injector.invoke(function($http, $cookieStore) {
+        .run(['$injector', function($injector) {
+            $injector.invoke(['$http', '$cookieStore', function($http,$cookieStore) {
                 // Cannot inject cookieStore and http to provider, so doing it here:
                 cookieStore = $cookieStore;
                 http = $http;
-            });
+            }]);
             // On load - set default headers from cookie (if managing default headers)
             defaultHeaders.set();
-        });
+        }]);
 
 
     angular.module('backand.utils', [])
