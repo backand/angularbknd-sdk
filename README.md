@@ -21,5 +21,5 @@ To upgrade version:
 3. Update the package.json version
 4. Run grunt - build the min files
 5. Commit your changes `git commit -am "Made some awesome new changes, now its even awesomer"`
-6. Tag the commit `git tag -a v0.0.2 -m "Release version 0.0.2"`
+6. Tag the commit `git tag -a 1.6.1 -m "Release version 1.6.1"`
 7. Push to GitHub `git push origin master --tags`
