@@ -1,6 +1,6 @@
 /*
 * Angular SDK to use with backand 
-* @version 1.6.0 - 2015-05-21
+* @version 1.6.1 - 2015-06-11
 * @link https://backand.com 
 * @author Itay Herskovits 
 * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -166,25 +166,36 @@
                     )
                 }
 
-                this.forgotPassword = function(email) {
+                this.requestResetPassword = function(email, appName) {
                     return http({
                             method: 'POST',
-                            url: config.apiUrl + '/api/account/SendChangePasswordLink',
+                            url: config.apiUrl + '/1/user/requestResetPassword',
                             data: {
+                                appName: appName,
                                 username: email
                             }
                         }
                     )
                 }
 
-                this.resetPassword = function(password, id) {
+                this.resetPassword = function(newPassword, resetToken) {
                     return http({
                         method: 'POST',
-                        url: config.apiUrl + '/api/account/changePassword',
+                        url: config.apiUrl + '/1/user/resetPassword',
                         data: {
-                            confirmPassword: password,
-                            password: password,
-                            token: id
+                            newPassword: newPassword,
+                            resetToken: resetToken
+                        }
+                    });
+                }
+
+                this.changePassword = function(oldPassword, newPassword) {
+                    return http({
+                        method: 'POST',
+                        url: config.apiUrl + '/1/user/changePassword',
+                        data: {
+                            oldPassword: oldPassword,
+                            newPassword: newPassword
                         }
                     });
                 }

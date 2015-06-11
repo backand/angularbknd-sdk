@@ -159,25 +159,36 @@
                     )
                 }
 
-                this.forgotPassword = function(email) {
+                this.requestResetPassword = function(email, appName) {
                     return http({
                             method: 'POST',
-                            url: config.apiUrl + '/api/account/SendChangePasswordLink',
+                            url: config.apiUrl + '/1/user/requestResetPassword',
                             data: {
+                                appName: appName,
                                 username: email
                             }
                         }
                     )
                 }
 
-                this.resetPassword = function(password, id) {
+                this.resetPassword = function(newPassword, resetToken) {
                     return http({
                         method: 'POST',
-                        url: config.apiUrl + '/api/account/changePassword',
+                        url: config.apiUrl + '/1/user/resetPassword',
                         data: {
-                            confirmPassword: password,
-                            password: password,
-                            token: id
+                            newPassword: newPassword,
+                            resetToken: resetToken
+                        }
+                    });
+                }
+
+                this.changePassword = function(oldPassword, newPassword) {
+                    return http({
+                        method: 'POST',
+                        url: config.apiUrl + '/1/user/changePassword',
+                        data: {
+                            oldPassword: oldPassword,
+                            newPassword: newPassword
                         }
                     });
                 }
