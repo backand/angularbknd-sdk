@@ -1,9 +1,16 @@
 /*
 * Angular SDK to use with backand 
-* @version 1.6.1 - 2015-06-11
+* @version 1.7.0 - 2015-07-21
 * @link https://backand.com 
 * @author Itay Herskovits 
 * @license MIT License, http://www.opensource.org/licenses/MIT
+ */
+/*
+ * Angular SDK to use with backand
+ * @version 1.7.0 - 2015-07-10
+ * @link https://backand.com
+ * @author Itay Herskovits
+ * @license MIT License, http://www.opensource.org/licenses/MIT
  */
 (function () {
     'use strict';
@@ -12,6 +19,7 @@
     var config;
     var defaultHeaders;
     var token;
+    var user;
     var http;
     angular.module('backand', ['ngCookies'])
         .provider('Backand', function () {
@@ -22,8 +30,10 @@
                 tokenName: 'backand_token',
                 anonymousToken: null,
                 signUpToken: null,
-                isManagingDefaultHeaders: false
-            }
+                isManagingDefaultHeaders: false,
+                appName: null,
+                userProfileName: 'backand_user'
+            };
 
             // Token
             token = {
@@ -36,7 +46,20 @@
                 remove: function () {
                     cookieStore.remove(config.tokenName);
                 }
-            }
+            };
+
+            // Current User
+            user = {
+                get: function() {
+                    return cookieStore.get(config.userProfileName);
+                },
+                set: function(_user) {
+                    cookieStore.put(config.userProfileName, _user);
+                },
+                remove: function () {
+                    cookieStore.remove(config.userProfileName);
+                }
+            };
 
             // Default headers
             defaultHeaders = {
@@ -67,14 +90,14 @@
             // Provider functions (should be called on module config block)
             this.getApiUrl = function () {
                 return config.apiUrl;
-            }
+            };
             this.setApiUrl = function (newApiUrl) {
                 config.apiUrl = newApiUrl;
                 return this;
             };
             this.getTokenName = function (newTokenName) {
                 return config.tokenName;
-            }
+            };
             this.setTokenName = function (newTokenName) {
                 config.tokenName = newTokenName;
                 return this;
@@ -83,8 +106,14 @@
                 config.anonymousToken = anonymousToken;
                 return this;
             };
+
             this.setSignUpToken = function (signUpToken) {
                 config.signUpToken = signUpToken;
+                return this;
+            };
+
+            this.setAppName = function (appName) {
+                config.appName = appName;
                 return this;
             };
 
@@ -92,7 +121,7 @@
                 if (isManagingDefaultHeaders == undefined) isManagingDefaultHeaders = true
                 config.isManagingDefaultHeaders = isManagingDefaultHeaders;
                 return this;
-            }
+            };
 
             // $get returns the service
             this.$get = ['$q', function ($q) {
@@ -101,8 +130,116 @@
 
             // Backand Service
             function BackandService($q) {
-                this.signin = function(username, password, appName) {
-                    var deferred = $q.defer();
+                var self = this;
+
+                var providers = {
+                    github: {name: 'github', label: 'Github', url: 'www.github.com', css: 'github', id: 1},
+                    google: {name: 'google', label: 'Google', url: 'www.google.com', css: 'google-plus', id: 2},
+                    facebook: {name: 'facebook', label: 'Facebook', url: 'www.facebook.com', css: 'facebook', id: 3}
+                };
+
+                self.getSocialProviders = function () {
+                    return providers;
+                };
+
+                function getSocialUrl(providerName, isSignup) {
+                    var provider = providers[providerName];
+                    var action = isSignup ? 'up' : 'in';
+                    return 'user/socialSign' + action +
+                        '?provider=' + provider.label +
+                        '&response_type=token&client_id=self&redirect_uri=' + provider.url +
+                        '&state=rcFNVUMsUOSNMJQZ%2bDTzmpqaGgSRGhUfUOyQHZl6gas%3d';
+                }
+
+                self.socialSignIn = function (provider, returnAddress) {
+                    return self.socialAuth(provider, returnAddress, false)
+                };
+
+                self.socialSignUp = function (provider, returnAddress) {
+                    return self.socialAuth(provider, returnAddress, true)
+                };
+
+                self.socialAuth = function (provider, returnAddress, isSignUp) {
+                    self.loginPromise = $q.defer();
+
+                    returnAddress =  returnAddress || encodeURIComponent(location.href.replace(/\?.*/g, ''));
+                    //var returnAddress =  encodeURIComponent((location.href + '/#/socialauth').replace(/\?.*/g, ''));
+
+                    window.open('https://api.backand.com:8079' + '/1/' +
+                        getSocialUrl(provider, isSignUp) +
+                        '&appname=' + config.appName +
+                        '&returnAddress=','id1','left=10,top=10,width=600,height=600');
+
+                    window.addEventListener('message', setUserDataFromToken, false);
+
+                    return self.loginPromise.promise;
+                };
+
+                function setUserDataFromToken (event) {
+                    if (event.origin !== location.origin)
+                        return;
+                    var userData = JSON.parse(event.data);
+                    if (userData.error) {
+                        self.loginPromise.reject({data: userData.error.message + ' (signing in with ' + userData.error.provider + ')'});
+                        return;
+                    } else if (userData.data) {
+                        return self.signInWithToken(userData.data);
+                    } else {
+                        self.loginPromise.reject();
+                    }
+                }
+
+                self.signin = function(username, password, appName) {
+                    self.loginPromise = $q.defer();
+
+                    if (appName) {
+                        self.setAppName(appName);
+                    }
+
+                    var userData = {
+                        grant_type: 'password',
+                        username: username,
+                        password: password,
+                        appname: config.appName
+                    };
+                    return authenticate(userData)
+                };
+
+                self.signInWithToken = function (userData) {
+
+                    var tokenData = {
+                        grant_type: 'password',
+                        accessToken: userData.access_token,
+                        appName: config.appName
+                    };
+                    return authenticate(tokenData)
+                };
+
+                self.getUserDetails = function () {
+                    return cookieStore.get(config.userProfileName);
+                };
+
+                self.getUsername = function () {
+                    var userDetails = cookieStore.get(config.userProfileName);
+                    if (userDetails) {
+                        return userDetails.username;
+                    }
+                    else {
+                        return null;
+                    }
+                };
+
+                self.getUserRole = function () {
+                    var userDetails = cookieStore.get(config.userProfileName);
+                    if (userDetails) {
+                        return userDetails.role;
+                    }
+                    else {
+                        return null;
+                    }
+                };
+
+                function authenticate (authData) {
                     token.remove();
                     defaultHeaders.clear();
                     http({
@@ -113,15 +250,10 @@
                             var str = [];
                             angular.forEach(obj, function(value, key){
                                 str.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
-                            })
+                            });
                             return str.join("&");
                         },
-                        data: {
-                            grant_type: 'password',
-                            username: username,
-                            password: password,
-                            appname: appName
-                        }
+                        data: authData
                     })
                         .success(function (data) {
                             if(angular.isDefined(data) && data != null){
@@ -129,28 +261,31 @@
                                     config.token = 'bearer ' + data.access_token;
                                     token.set(config.token);
                                     defaultHeaders.set();
-                                    deferred.resolve(config.token);
+                                    user.set(data);
+                                    self.loginPromise.resolve(config.token);
                                 }
                             }
                             else {
-                                deferred.reject('token is undefined');
+                                self.loginPromise.reject('token is undefined');
                             }
 
                         })
                         .error(function (err) {
-                            deferred.reject(err);
+                            self.loginPromise.reject(err);
                         });
 
-                    return deferred.promise;
+                    return self.loginPromise.promise;
                 }
 
-                this.signout = function() {
+                self.signout = function() {
                     token.remove();
+                    user.remove();
                     defaultHeaders.clear();
+                    defaultHeaders.set();
                     return $q.when(true);
-                }
+                };
 
-                this.signup = function (firstName, lastName, email, password, confirmPassword) {
+                self.signup = function (firstName, lastName, email, password, confirmPassword) {
                     return http({
                             method: 'POST',
                             url: config.apiUrl + '/1/user/signup',
@@ -164,21 +299,26 @@
                             }
                         }
                     )
-                }
+                };
 
-                this.requestResetPassword = function(email, appName) {
+                self.requestResetPassword = function(email, appName) {
+
+                    if (appName) {
+                        self.setAppName(appName);
+                    }
+
                     return http({
                             method: 'POST',
                             url: config.apiUrl + '/1/user/requestResetPassword',
                             data: {
-                                appName: appName,
+                                appName: config.appName,
                                 username: email
                             }
                         }
                     )
-                }
+                };
 
-                this.resetPassword = function(newPassword, resetToken) {
+                self.resetPassword = function(newPassword, resetToken) {
                     return http({
                         method: 'POST',
                         url: config.apiUrl + '/1/user/resetPassword',
@@ -187,9 +327,9 @@
                             resetToken: resetToken
                         }
                     });
-                }
+                };
 
-                this.changePassword = function(oldPassword, newPassword) {
+                self.changePassword = function(oldPassword, newPassword) {
                     return http({
                         method: 'POST',
                         url: config.apiUrl + '/1/user/changePassword',
@@ -198,111 +338,39 @@
                             newPassword: newPassword
                         }
                     });
-                }
+                };
 
-                this.getToken = function() {
+                self.getToken = function() {
                     return token.get();
-                }
+                };
 
-                this.getTokenName = function() {
+                self.getTokenName = function() {
                     return config.tokenName;
-                }
+                };
 
-                this.getApiUrl = function () {
+                self.getApiUrl = function () {
                     return config.apiUrl;
-                }
+                };
             }
         })
-        .run(['$injector', function($injector) {
-            $injector.invoke(['$http', '$cookieStore', function($http,$cookieStore) {
+        .run(['$injector', '$location', function($injector, $location) {
+            $injector.invoke(['$http', '$cookieStore', function($http, $cookieStore) {
                 // Cannot inject cookieStore and http to provider, so doing it here:
                 cookieStore = $cookieStore;
                 http = $http;
             }]);
             // On load - set default headers from cookie (if managing default headers)
             defaultHeaders.set();
+
+            // get token or error message from url in social sign-in popup
+            var dataRegex = /\?(data|error)=(.+)/;
+            var dataMatch = dataRegex.exec(location.href);
+            if (dataMatch && dataMatch[1] && dataMatch[2]) {
+                var userData = {};
+                userData[dataMatch[1]] = JSON.parse(decodeURI(dataMatch[2].replace('#', '')));
+                window.opener.postMessage(JSON.stringify(userData), location.origin);
+                window.close();
+            }
         }]);
-
-
-    angular.module('backand.utils', [])
-        .provider('BackandUtils', function () {
-
-            this.$get = ['$http', '$q', '$upload', function ($http, $q, $upload) {
-                this.uploadFile = function(file, tableName, fieldName) {
-                    var response = $q.defer();
-                    $upload.upload({
-                        url: config.apiUrl + '/1/file/upload/' + tableName + '/' + fieldName,
-                        file: file,
-                        headers: {
-                            'Authorization': token.get()
-                        }
-                    }).success(function (data) {
-                        var curr = {message: '', url: '', success: false};
-
-                        if (data.files[0].success) {
-                            curr.url = data.files[0].url;
-                            curr.success = true;
-                        } else {
-                            curr.message = data.files[0].error;
-                            curr.success = false;
-                        }
-                        response.resolve(curr);
-                    }).error(function (data) {
-                        var curr = {message: '', url: '', success: false};
-                        curr.message = data.Message;
-                        curr.success = false;
-                        response.resolve(curr);
-                    });
-
-                    return response.promise;
-                }
-            }]
-        });
-
-    angular.module('backand.orm', [])
-        .provider('BackandORM', function () {
-
-            this.$get = ['Restangular', 'Backand', function (Restangular, Backand) {
-
-                function createORMForConfiguration(backandConfig) {
-                    //ORM of Backand
-                    var orm = {};
-                    function config() {
-                        Restangular.setResponseExtractor(function (response, operation) {
-                            if (operation === 'getList' && !angular.isArray(response)) {
-                                return response.data;
-                            }
-                            return response;
-                        });
-
-                        Restangular.setRestangularFields({
-                            id: "__metadata.id",
-                            route: "restangularRoute",
-                            selfLink: "self.href"
-                        });
-
-                        Restangular.setBaseUrl(backandConfig.apiUrl + "/1/objects");
-                    }
-
-                    function setCredentials(token) {
-                        Restangular.setDefaultHeaders({ Authorization: token });
-                    }
-
-                    function clearCredentials() {
-                        Restangular.setDefaultHeaders({ Authorization: '' });
-
-                    }
-
-                    orm.config = config;
-                    orm.setCredentials = setCredentials;
-                    orm.clearCredentials = clearCredentials;
-
-                    return orm;
-
-                }
-
-                return createORMForConfiguration(Backand.configuration);
-            }]
-        });
 
 })();
