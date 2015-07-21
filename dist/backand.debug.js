@@ -5,13 +5,6 @@
 * @author Itay Herskovits 
 * @license MIT License, http://www.opensource.org/licenses/MIT
  */
-/*
- * Angular SDK to use with backand
- * @version 1.7.0 - 2015-07-10
- * @link https://backand.com
- * @author Itay Herskovits
- * @license MIT License, http://www.opensource.org/licenses/MIT
- */
 (function () {
     'use strict';
 
