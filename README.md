@@ -13,13 +13,13 @@ Register on bower (only once at first time - done):
 
 To upgrade version:
 
-1. Update the code of backand.js
-2. Update the bower.json version
+1. Update the code of `backand.js`
+2. Update the `bower.json` version
   * Check dependencies versions, if need to be upgraded
   * minor releases for bug fixes
   * major releases for changes in the API signature
-3. Update the package.json version
-4. Run grunt - build the min files
+3. Update the `package.json` version
+4. Run `grunt` to build the min files
 5. Commit your changes `git commit -am "Made some awesome new changes, now its even awesome"`
 6. Tag the commit `git tag -a 1.6.1 -m "Release version 1.6.1"`
 7. Push to GitHub `git push origin master --tags`
