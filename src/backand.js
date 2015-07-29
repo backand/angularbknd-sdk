@@ -16,6 +16,7 @@
     var http;
     angular.module('backand', ['ngCookies'])
         .provider('Backand', function () {
+            var BackandProvider = this;
 
             // Configuration
             config = {
@@ -186,7 +187,7 @@
                     self.loginPromise = $q.defer();
 
                     if (appName) {
-                        self.setAppName(appName);
+                        BackandProvider.setAppName(appName);
                     }
 
                     var userData = {
@@ -208,8 +209,21 @@
                     return authenticate(tokenData)
                 };
 
-                self.getUserDetails = function () {
-                    return cookieStore.get(config.userProfileName);
+                self.getUserDetails = function (force) {
+                    var deferred = $q.defer();
+                    if (force) {
+                        http({
+                            method: 'GET',
+                            url: config.apiUrl + '/1/account/profile'
+                            })
+                            .success(function (profile) {
+                                user.set(profile);
+                                deferred.resolve(user.get());
+                            })
+                    } else {
+                        deferred.resolve(user.get());
+                    }
+                    return deferred.promise;
                 };
 
                 self.getUsername = function () {
@@ -297,7 +311,7 @@
                 self.requestResetPassword = function(email, appName) {
 
                     if (appName) {
-                        self.setAppName(appName);
+                        BackandProvider.setAppName(appName);
                     }
 
                     return http({
@@ -360,7 +374,7 @@
             var dataMatch = dataRegex.exec(location.href);
             if (dataMatch && dataMatch[1] && dataMatch[2]) {
                 var userData = {};
-                userData[dataMatch[1]] = JSON.parse(decodeURI(dataMatch[2].replace('#', '')));
+                userData[dataMatch[1]] = JSON.parse(decodeURI(dataMatch[2].replace('#.*', '')));
                 window.opener.postMessage(JSON.stringify(userData), location.origin);
                 window.close();
             }
