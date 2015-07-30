@@ -8,6 +8,15 @@
 (function () {
     'use strict';
 
+    // get token or error message from url in social sign-in popup
+    var dataRegex = /\?(data|error)=(.+)/;
+    var dataMatch = dataRegex.exec(location.href);
+    if (dataMatch && dataMatch[1] && dataMatch[2]) {
+        var userData = {};
+        userData[dataMatch[1]] = JSON.parse(decodeURI(dataMatch[2].replace(/#.*/, '')));
+        window.opener.postMessage(JSON.stringify(userData), location.origin);
+    }
+
     var cookieStore;
     var config;
     var defaultHeaders;
@@ -145,11 +154,17 @@
                         '&state=rcFNVUMsUOSNMJQZ%2bDTzmpqaGgSRGhUfUOyQHZl6gas%3d';
                 }
 
-                self.socialSignIn = function (provider, returnAddress) {
+                self.socialSignIn = function (provider, returnAddress, appName) {
+                    if (appName) {
+                        BackandProvider.setAppName(appName);
+                    }
                     return self.socialAuth(provider, returnAddress, false)
                 };
 
-                self.socialSignUp = function (provider, returnAddress) {
+                self.socialSignUp = function (provider, returnAddress, appName) {
+                    if (appName) {
+                        BackandProvider.setAppName(appName);
+                    }
                     return self.socialAuth(provider, returnAddress, true)
                 };
 
@@ -159,17 +174,18 @@
                     returnAddress =  returnAddress || encodeURIComponent(location.href.replace(/\?.*/g, ''));
                     //var returnAddress =  encodeURIComponent((location.href + '/#/socialauth').replace(/\?.*/g, ''));
 
-                    window.open('https://api.backand.com:8079' + '/1/' +
+                    self.socialAuthWindow = window.open('https://api.backand.com:8079' + '/1/' +
                         getSocialUrl(provider, isSignUp) +
                         '&appname=' + config.appName +
-                        '&returnAddress=','id1','left=10,top=10,width=600,height=600');
+                        '&returnAddress=', 'id1', 'left=10, top=10, width=600, height=600');
 
                     window.addEventListener('message', setUserDataFromToken, false);
-
                     return self.loginPromise.promise;
                 };
 
                 function setUserDataFromToken (event) {
+                    self.socialAuthWindow.close();
+                    self.socialAuthWindow = null;
                     if (event.origin !== location.origin)
                         return;
                     var userData = JSON.parse(event.data);
@@ -292,7 +308,10 @@
                     return $q.when(true);
                 };
 
-                self.signup = function (firstName, lastName, email, password, confirmPassword) {
+                self.signup = function (firstName, lastName, email, password, confirmPassword, appName) {
+                    if (appName) {
+                        BackandProvider.setAppName(appName);
+                    }
                     return http({
                             method: 'POST',
                             url: config.apiUrl + '/1/user/signup',
@@ -368,16 +387,6 @@
             }]);
             // On load - set default headers from cookie (if managing default headers)
             defaultHeaders.set();
-
-            // get token or error message from url in social sign-in popup
-            var dataRegex = /\?(data|error)=(.+)/;
-            var dataMatch = dataRegex.exec(location.href);
-            if (dataMatch && dataMatch[1] && dataMatch[2]) {
-                var userData = {};
-                userData[dataMatch[1]] = JSON.parse(decodeURI(dataMatch[2].replace('#.*', '')));
-                window.opener.postMessage(JSON.stringify(userData), location.origin);
-                window.close();
-            }
         }]);
 
 })();
