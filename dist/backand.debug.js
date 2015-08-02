@@ -1,12 +1,21 @@
 /*
 * Angular SDK to use with backand 
-* @version 1.7.1 - 2015-07-21
+* @version 1.7.2 - 2015-08-02
 * @link https://backand.com 
 * @author Itay Herskovits 
 * @license MIT License, http://www.opensource.org/licenses/MIT
  */
 (function () {
     'use strict';
+
+    // get token or error message from url in social sign-in popup
+    var dataRegex = /\?(data|error)=(.+)/;
+    var dataMatch = dataRegex.exec(location.href);
+    if (dataMatch && dataMatch[1] && dataMatch[2]) {
+        var userData = {};
+        userData[dataMatch[1]] = JSON.parse(decodeURI(dataMatch[2].replace(/#.*/, '')));
+        window.opener.postMessage(JSON.stringify(userData), location.origin);
+    }
 
     var cookieStore;
     var config;
@@ -19,7 +28,7 @@
 
             // Configuration
             config = {
-                apiUrl: "https://api.backand.com:8080",
+                apiUrl: "https://api.backand.com",
                 tokenName: 'backand_token',
                 anonymousToken: null,
                 signUpToken: null,
@@ -125,6 +134,10 @@
             function BackandService($q) {
                 var self = this;
 
+                self.setAppName = function (appName) {
+                    config.appName = appName;
+                };
+
                 var providers = {
                     github: {name: 'github', label: 'Github', url: 'www.github.com', css: 'github', id: 1},
                     google: {name: 'google', label: 'Google', url: 'www.google.com', css: 'google-plus', id: 2},
@@ -141,39 +154,40 @@
                     return 'user/socialSign' + action +
                         '?provider=' + provider.label +
                         '&response_type=token&client_id=self&redirect_uri=' + provider.url +
-                        '&state=rcFNVUMsUOSNMJQZ%2bDTzmpqaGgSRGhUfUOyQHZl6gas%3d';
+                        '&state=';
                 }
 
-                self.socialSignIn = function (provider, returnAddress) {
-                    return self.socialAuth(provider, returnAddress, false)
+                self.socialSignIn = function (provider) {
+                    return self.socialAuth(provider, false)
                 };
 
-                self.socialSignUp = function (provider, returnAddress) {
-                    return self.socialAuth(provider, returnAddress, true)
+                self.socialSignUp = function (provider) {
+                    return self.socialAuth(provider, true)
                 };
 
-                self.socialAuth = function (provider, returnAddress, isSignUp) {
+                self.socialAuth = function (provider, isSignUp) {
                     self.loginPromise = $q.defer();
 
-                    returnAddress =  returnAddress || encodeURIComponent(location.href.replace(/\?.*/g, ''));
-                    //var returnAddress =  encodeURIComponent((location.href + '/#/socialauth').replace(/\?.*/g, ''));
-
-                    window.open('https://api.backand.com:8079' + '/1/' +
+                    self.socialAuthWindow = window.open(
+                        config.apiUrl + '/1/' +
                         getSocialUrl(provider, isSignUp) +
-                        '&appname=' + config.appName +
-                        '&returnAddress=','id1','left=10,top=10,width=600,height=600');
+                        '&appname=' + config.appName + '&returnAddress=',
+                        'id1', 'left=10, top=10, width=600, height=600');
 
                     window.addEventListener('message', setUserDataFromToken, false);
-
                     return self.loginPromise.promise;
                 };
 
                 function setUserDataFromToken (event) {
+                    self.socialAuthWindow.close();
+                    self.socialAuthWindow = null;
                     if (event.origin !== location.origin)
                         return;
                     var userData = JSON.parse(event.data);
                     if (userData.error) {
-                        self.loginPromise.reject({data: userData.error.message + ' (signing in with ' + userData.error.provider + ')'});
+                        self.loginPromise.reject({
+                            data: userData.error.message + ' (signing in with ' + userData.error.provider + ')'
+                        });
                         return;
                     } else if (userData.data) {
                         return self.signInWithToken(userData.data);
@@ -208,8 +222,21 @@
                     return authenticate(tokenData)
                 };
 
-                self.getUserDetails = function () {
-                    return cookieStore.get(config.userProfileName);
+                self.getUserDetails = function (force) {
+                    var deferred = $q.defer();
+                    if (force) {
+                        http({
+                            method: 'GET',
+                            url: config.apiUrl + '/1/account/profile'
+                        })
+                            .success(function (profile) {
+                                user.set(profile);
+                                deferred.resolve(user.get());
+                            })
+                    } else {
+                        deferred.resolve(user.get());
+                    }
+                    return deferred.promise;
                 };
 
                 self.getUsername = function () {
@@ -354,16 +381,6 @@
             }]);
             // On load - set default headers from cookie (if managing default headers)
             defaultHeaders.set();
-
-            // get token or error message from url in social sign-in popup
-            var dataRegex = /\?(data|error)=(.+)/;
-            var dataMatch = dataRegex.exec(location.href);
-            if (dataMatch && dataMatch[1] && dataMatch[2]) {
-                var userData = {};
-                userData[dataMatch[1]] = JSON.parse(decodeURI(dataMatch[2].replace('#', '')));
-                window.opener.postMessage(JSON.stringify(userData), location.origin);
-                window.close();
-            }
         }]);
 
 })();
