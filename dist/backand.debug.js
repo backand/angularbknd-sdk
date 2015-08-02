@@ -1,9 +1,9 @@
 /*
- * Angular SDK to use with backand
- * @version 1.7.0 - 2015-07-30
- * @link https://backand.com
- * @author Itay Herskovits
- * @license MIT License, http://www.opensource.org/licenses/MIT
+* Angular SDK to use with backand 
+* @version 1.7.0 - 2015-08-02
+* @link https://backand.com 
+* @author Itay Herskovits 
+* @license MIT License, http://www.opensource.org/licenses/MIT
  */
 (function () {
     'use strict';
@@ -25,11 +25,10 @@
     var http;
     angular.module('backand', ['ngCookies'])
         .provider('Backand', function () {
-            var BackandProvider = this;
 
             // Configuration
             config = {
-                apiUrl: "https://api.backand.com:8080",
+                apiUrl: "https://api.backand.com",
                 tokenName: 'backand_token',
                 anonymousToken: null,
                 signUpToken: null,
@@ -135,6 +134,10 @@
             function BackandService($q) {
                 var self = this;
 
+                self.setAppName = function (appName) {
+                    config.appName = appName;
+                };
+
                 var providers = {
                     github: {name: 'github', label: 'Github', url: 'www.github.com', css: 'github', id: 1},
                     google: {name: 'google', label: 'Google', url: 'www.google.com', css: 'google-plus', id: 2},
@@ -151,33 +154,25 @@
                     return 'user/socialSign' + action +
                         '?provider=' + provider.label +
                         '&response_type=token&client_id=self&redirect_uri=' + provider.url +
-                        '&state=rcFNVUMsUOSNMJQZ%2bDTzmpqaGgSRGhUfUOyQHZl6gas%3d';
+                        '&state=';
                 }
 
-                self.socialSignIn = function (provider, returnAddress, appName) {
-                    if (appName) {
-                        BackandProvider.setAppName(appName);
-                    }
-                    return self.socialAuth(provider, returnAddress, false)
+                self.socialSignIn = function (provider) {
+                    return self.socialAuth(provider, false)
                 };
 
-                self.socialSignUp = function (provider, returnAddress, appName) {
-                    if (appName) {
-                        BackandProvider.setAppName(appName);
-                    }
-                    return self.socialAuth(provider, returnAddress, true)
+                self.socialSignUp = function (provider) {
+                    return self.socialAuth(provider, true)
                 };
 
-                self.socialAuth = function (provider, returnAddress, isSignUp) {
+                self.socialAuth = function (provider, isSignUp) {
                     self.loginPromise = $q.defer();
 
-                    returnAddress =  returnAddress || encodeURIComponent(location.href.replace(/\?.*/g, ''));
-                    //var returnAddress =  encodeURIComponent((location.href + '/#/socialauth').replace(/\?.*/g, ''));
-
-                    self.socialAuthWindow = window.open('https://api.backand.com:8079' + '/1/' +
-                        getSocialUrl(provider, isSignUp) +
-                        '&appname=' + config.appName +
-                        '&returnAddress=', 'id1', 'left=10, top=10, width=600, height=600');
+                    self.socialAuthWindow = window.open(
+                      config.apiUrl + '/1/' +
+                      getSocialUrl(provider, isSignUp) +
+                      '&appname=' + config.appName + '&returnAddress=',
+                      'id1', 'left=10, top=10, width=600, height=600');
 
                     window.addEventListener('message', setUserDataFromToken, false);
                     return self.loginPromise.promise;
@@ -186,12 +181,13 @@
                 function setUserDataFromToken (event) {
                     self.socialAuthWindow.close();
                     self.socialAuthWindow = null;
-
                     if (event.origin !== location.origin)
                         return;
                     var userData = JSON.parse(event.data);
                     if (userData.error) {
-                        self.loginPromise.reject({data: userData.error.message + ' (signing in with ' + userData.error.provider + ')'});
+                        self.loginPromise.reject({
+                            data: userData.error.message + ' (signing in with ' + userData.error.provider + ')'
+                        });
                         return;
                     } else if (userData.data) {
                         return self.signInWithToken(userData.data);
@@ -204,7 +200,7 @@
                     self.loginPromise = $q.defer();
 
                     if (appName) {
-                        BackandProvider.setAppName(appName);
+                        self.setAppName(appName);
                     }
 
                     var userData = {
@@ -309,10 +305,7 @@
                     return $q.when(true);
                 };
 
-                self.signup = function (firstName, lastName, email, password, confirmPassword, appName) {
-                    if (appName) {
-                        BackandProvider.setAppName(appName);
-                    }
+                self.signup = function (firstName, lastName, email, password, confirmPassword) {
                     return http({
                             method: 'POST',
                             url: config.apiUrl + '/1/user/signup',
@@ -331,7 +324,7 @@
                 self.requestResetPassword = function(email, appName) {
 
                     if (appName) {
-                        BackandProvider.setAppName(appName);
+                        self.setAppName(appName);
                     }
 
                     return http({
