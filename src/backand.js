@@ -220,7 +220,7 @@
                     if (force) {
                         http({
                             method: 'GET',
-                            url: config.apiUrl + '/1/account/profile'
+                            url: config.apiUrl + '/api/account/profile'
                         })
                             .success(function (profile) {
                                 user.set(profile);
