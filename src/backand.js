@@ -119,13 +119,18 @@
             };
 
             // $get returns the service
-            this.$get = ['$q', function ($q) {
-                return new BackandService($q);
+            this.$get = ['$q', '$rootScope', function ($q, $rootScope) {
+                return new BackandService($q, $rootScope);
             }];
 
             // Backand Service
-            function BackandService($q) {
+            function BackandService($q, $rootScope) {
                 var self = this;
+
+                self.EVENTS = {
+                    SIGNIN: 'BackandSignIn',
+                    SIGNOUT: 'BackandSignOut',
+                };
 
                 self.setAppName = function (appName) {
                     config.appName = appName;
@@ -149,11 +154,6 @@
                         '&response_type=token&client_id=self&redirect_uri=' + provider.url +
                         '&state=';
                 }
-
-                // backward compatibility
-                self.socialSignIn = self.socialSignin;
-                self.socialSignUp = self.socialSignup;
-                self.signinWithToken = self.signInWithToken;
 
                 self.socialSignin = function (provider) {
                     return self.socialAuth(provider, false)
@@ -282,6 +282,7 @@
                                     defaultHeaders.set();
                                     user.set(data);
                                     self.loginPromise.resolve(config.token);
+                                    $rootScope.$broadcast(self.EVENTS.SIGNIN);
                                 }
                             }
                             else {
@@ -301,6 +302,7 @@
                     user.remove();
                     defaultHeaders.clear();
                     defaultHeaders.set();
+                    $rootScope.$broadcast(self.EVENTS.SIGNOUT);
                     return $q.when(true);
                 };
 
@@ -370,6 +372,11 @@
                 self.getApiUrl = function () {
                     return config.apiUrl;
                 };
+
+                // backward compatibility
+                self.socialSignIn = self.socialSignin;
+                self.socialSignUp = self.socialSignup;
+                self.signInWithToken = self.signinWithToken;
             }
         })
         .run(['$injector', '$location', function($injector, $location) {
