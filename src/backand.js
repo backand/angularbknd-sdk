@@ -150,11 +150,16 @@
                         '&state=';
                 }
 
-                self.socialSignIn = function (provider) {
+                // backward compatibility
+                self.socialSignIn = self.socialSignin;
+                self.socialSignUp = self.socialSignup;
+                self.signinWithToken = self.signInWithToken;
+
+                self.socialSignin = function (provider) {
                     return self.socialAuth(provider, false)
                 };
 
-                self.socialSignUp = function (provider) {
+                self.socialSignup = function (provider) {
                     return self.socialAuth(provider, true)
                 };
 
@@ -205,7 +210,8 @@
                     return authenticate(userData)
                 };
 
-                self.signInWithToken = function (userData) {
+                self.signinWithToken = function (userData) {
+                    self.loginPromise = $q.defer();
 
                     var tokenData = {
                         grant_type: 'password',
