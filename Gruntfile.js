@@ -25,7 +25,8 @@ module.exports = function (grunt) {
                     separator: ';'
                 },
                 src: [
-                'src/backand.js',
+                'src/*.js',
+                'src/*/*.js'
                 ],
                 dest: 'dist/<%= pkg.name %>.debug.js'
             }

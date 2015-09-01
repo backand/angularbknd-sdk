@@ -1,6 +1,6 @@
 /*
 * Angular SDK to use with backand 
-* @version 1.7.2 - 2015-08-31
+* @version 1.7.2 - 2015-09-01
 * @link https://backand.com 
 * @author Itay Herskovits 
 * @license MIT License, http://www.opensource.org/licenses/MIT
@@ -78,13 +78,19 @@
                 },
 
                 // clear default Authorization header for all future $http calls
-                clear: function() {
+                clear: function(type) {
                     if (!config.isManagingDefaultHeaders) return;
-                    if (http.defaults.headers.common['Authorization']) {
-                        delete http.defaults.headers.common['Authorization'];
-                    }
-                    if (http.defaults.headers.common['AnonymousToken']) {
-                        delete http.defaults.headers.common['AnonymousToken'];
+                    if (type) {
+                        if (http.defaults.headers.common[type]) {
+                            delete http.defaults.headers.common[type];
+                        }
+                    } else {
+                        if (http.defaults.headers.common['Authorization']) {
+                            delete http.defaults.headers.common['Authorization'];
+                        }
+                        if (http.defaults.headers.common['AnonymousToken']) {
+                            delete http.defaults.headers.common['AnonymousToken'];
+                        }
                     }
                 }
             };
@@ -126,13 +132,15 @@
             };
 
             // $get returns the service
-            this.$get = ['$q', '$rootScope', function ($q, $rootScope) {
-                return new BackandService($q, $rootScope);
+            this.$get = ['$q', '$rootScope', 'BackandHttpBufferService', function ($q, $rootScope, BackandHttpBufferService) {
+                return new BackandService($q, $rootScope, BackandHttpBufferService);
             }];
 
             // Backand Service
-            function BackandService($q, $rootScope) {
+            function BackandService($q, $rootScope, BackandHttpBufferService) {
                 var self = this;
+
+                var authenticating = false;
 
                 self.EVENTS = {
                     SIGNIN: 'BackandSignIn',
@@ -195,15 +203,13 @@
                         });
                         return;
                     } else if (userData.data) {
-                        return self.signInWithToken(userData.data);
+                        return self.signinWithToken(userData.data);
                     } else {
                         self.loginPromise.reject();
                     }
                 }
 
                 self.signin = function(username, password, appName) {
-                    self.loginPromise = $q.defer();
-
                     if (appName) {
                         self.setAppName(appName);
                     }
@@ -218,8 +224,6 @@
                 };
 
                 self.signinWithToken = function (userData) {
-                    self.loginPromise = $q.defer();
-
                     var tokenData = {
                         grant_type: 'password',
                         accessToken: userData.access_token,
@@ -266,9 +270,13 @@
                 };
 
                 function authenticate (authData) {
+                    if (authenticating) {
+                        return;
+                    }
+                    authenticating = true;
                     token.remove();
                     defaultHeaders.clear();
-                    http({
+                    return http({
                         method: 'POST',
                         url: config.apiUrl + '/token',
                         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
@@ -280,28 +288,36 @@
                             return str.join("&");
                         },
                         data: authData
+
+                    }).then(function (response) {
+                        if (response.data && response.data.access_token) {
+                            config.token = 'bearer ' + response.data.access_token;
+
+                            token.set(config.token);
+                            defaultHeaders.set();
+                            user.set(response.data);
+
+                            if (self.loginPromise) {
+                                self.loginPromise.resolve(config.token);
+                            }
+
+                            BackandHttpBufferService.retryAll();
+                            $rootScope.$broadcast(self.EVENTS.SIGNIN);
+
+                        } else if (self.loginPromise) {
+                            self.loginPromise.reject('token is undefined');
+                        }
+                        return response.data;
+
                     })
-                        .success(function (data) {
-                            if(angular.isDefined(data) && data != null){
-                                if(angular.isDefined(data.access_token)) {
-                                    config.token = 'bearer ' + data.access_token;
-                                    token.set(config.token);
-                                    defaultHeaders.set();
-                                    user.set(data);
-                                    self.loginPromise.resolve(config.token);
-                                    $rootScope.$broadcast(self.EVENTS.SIGNIN);
-                                }
-                            }
-                            else {
-                                self.loginPromise.reject('token is undefined');
-                            }
-
-                        })
-                        .error(function (err) {
+                    .catch(function (err) {
+                        if (self.loginPromise) {
                             self.loginPromise.reject(err);
-                        });
-
-                    return self.loginPromise.promise;
+                        }
+                    })
+                    .finally(function () {
+                        authenticating = false;
+                    });
                 }
 
                 self.signout = function() {
@@ -309,6 +325,7 @@
                     user.remove();
                     defaultHeaders.clear();
                     defaultHeaders.set();
+                    BackandHttpBufferService.rejectAll('signed out');
                     $rootScope.$broadcast(self.EVENTS.SIGNOUT);
                     return $q.when(true);
                 };
@@ -368,6 +385,18 @@
                     });
                 };
 
+                self.refreshToken = function () {
+                    defaultHeaders.clear('Authorization');
+
+                    var tokenData = {
+                        grant_type: 'password',
+                        refreshToken: user.get().refresh_token,
+                        username: self.getUsername(),
+                        appName: config.appName
+                    };
+                    return authenticate(tokenData);
+                };
+
                 self.getToken = function() {
                     return token.get();
                 };
@@ -386,7 +415,10 @@
                 self.signInWithToken = self.signinWithToken;
             }
         })
-        .run(['$injector', '$location', function($injector, $location) {
+        .config(['$httpProvider', function ($httpProvider) {
+            $httpProvider.interceptors.push('BackandHttpInterceptor');
+        }])
+        .run(['$injector', function($injector) {
             $injector.invoke(['$http', '$cookieStore', function($http, $cookieStore) {
                 // Cannot inject cookieStore and http to provider, so doing it here:
                 cookieStore = $cookieStore;
@@ -395,5 +427,76 @@
             // On load - set default headers from cookie (if managing default headers)
             defaultHeaders.set();
         }]);
+
+})();
+;(function () {
+    angular.module('backand').factory('BackandHttpInterceptor', ['$q', 'Backand', 'BackandHttpBufferService', HttpInterceptor]);
+
+
+    function HttpInterceptor ($q, Backand, BackandHttpBufferService) {
+        return {
+            responseError: function (rejection) {
+                if (rejection.config.url !== Backand.getApiUrl() + 'token') {
+                    if (rejection.status === 401) {
+
+                        Backand.refreshToken();
+                        var deferred = $q.defer();
+                        BackandHttpBufferService.append(rejection.config, deferred);
+                        return deferred.promise;
+                    }
+                }
+                return $q.reject(rejection);
+            }
+        }
+    }
+})();
+;(function () {
+    angular.module('backand').service('BackandHttpBufferService', ['$injector', HttpBufferService]);
+
+        function HttpBufferService($injector) {
+        var self = this;
+        var buffer = [];
+
+        function retryHttpRequest(config, deferred) {
+            function successCallback(response) {
+                deferred.resolve(response);
+            }
+            function errorCallback(response) {
+                deferred.reject(response);
+            }
+            var $http = $injector.get('$http');
+            $http = $http || $injector.get('$http');
+            $http(config).then(successCallback, errorCallback);
+        }
+
+        self.append = function (config, deferred) {
+            buffer.push({
+                config: config,
+                deferred: deferred
+            });
+        };
+
+        self.rejectAll = function (reason) {
+            if (reason) {
+                for (var i = 0; i < buffer.length; ++i) {
+                    buffer[i].deferred.reject(reason);
+                }
+            }
+            buffer = [];
+        };
+
+        function updater (config) {
+            delete config.headers.Authorization;
+            return config;
+        }
+
+        self.retryAll = function () {
+            for (var i = 0; i < buffer.length; ++i) {
+                retryHttpRequest(updater(buffer[i].config), buffer[i].deferred);
+            }
+            buffer = [];
+        }
+
+    }
 
 })();
