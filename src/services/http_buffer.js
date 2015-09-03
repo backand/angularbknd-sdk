@@ -12,9 +12,8 @@
             function errorCallback(response) {
                 deferred.reject(response);
             }
-            var $http = $injector.get('$http');
-            $http = $http || $injector.get('$http');
-            $http(config).then(successCallback, errorCallback);
+
+            http(config).then(successCallback, errorCallback);
         }
 
         self.append = function (config, deferred) {

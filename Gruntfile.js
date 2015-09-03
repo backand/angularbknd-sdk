@@ -22,11 +22,16 @@ module.exports = function (grunt) {
 
             js: {
                 options: {
+                    banner: '(function () {\n',
+                    footer: '})();\n',
                     separator: ';'
                 },
                 src: [
-                'src/*.js',
-                'src/*/*.js'
+                    'src/utils/*.js',
+                    'src/globals.js',
+                    'src/backand.js',
+                    'src/*.js',
+                    'src/*/*.js'
                 ],
                 dest: 'dist/<%= pkg.name %>.debug.js'
             }

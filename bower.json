@@ -19,7 +19,6 @@
   "license": "MIT",
   "private": false,
   "dependencies": {
-    "angular": "latest",
-    "angular-cookies": "latest"
+    "angular": "latest"
   }
 }
