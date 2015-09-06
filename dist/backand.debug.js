@@ -1,10 +1,10 @@
 (function () {
-var BKStorage = (function(){
+var BKStorage = (function () {
     'use strict';
 
     var prefix = 'BACKAND';
 
-    function Store(storeName, type){
+    function Store (storeName, type) {
 
         var storageAPI;
 
@@ -13,7 +13,7 @@ var BKStorage = (function(){
         if (typeof window !== 'undefined' && typeof window[type + 'Storage'] !== 'undefined') {
             storageAPI = window[type + 'Storage'];
         } else {
-            // We can fallback to other solution here inMemory Mangement
+            // We can fallback to other solution here inMemory Management
             // It could be cookies if needed
             storageAPI = {
                 value: null,
@@ -25,7 +25,7 @@ var BKStorage = (function(){
                 },
                 removeItem: function (name, params) {
                     this.value = null;
-                },
+                }
             };
         }
 
@@ -48,7 +48,7 @@ var BKStorage = (function(){
     };
 
     return {
-        register: function(storeName, type) {
+        register: function (storeName, type) {
             if(!storeName) {
                 throw Error('Invalid Store Name');
             }
@@ -56,7 +56,7 @@ var BKStorage = (function(){
             return this;
         },
 
-        remove: function(storeName) {
+        remove: function (storeName) {
             this[storeName].command('remove');
             delete this[storeName];
             return this;
@@ -71,7 +71,7 @@ var config = {
     tokenName: 'backand_token',
     anonymousToken: null,
     signUpToken: null,
-    isManagingDefaultHeaders: false,
+    isManagingDefaultHeaders: true,
     appName: null,
     userProfileName: 'backand_user'
 };
@@ -113,7 +113,7 @@ BKStorage.register('user');
 }());
 ;'use strict';
 
-angular.module('backand', ['ngCookies'])
+angular.module('backand', [])
     .provider('Backand', function () {
 
         // Provider functions (should be called on module config block)
@@ -156,12 +156,12 @@ angular.module('backand', ['ngCookies'])
         };
 
         // $get returns the service
-        this.$get = ['$q', 'BackandAuthService', function ($q, BackandAuthService) {
-            return new BackandService($q, BackandAuthService);
+        this.$get = ['BackandAuthService', 'BackandUserService', function (BackandAuthService, BackandUserService) {
+            return new BackandService(BackandAuthService, BackandUserService);
         }];
 
         // Backand Service
-        function BackandService($q, BackandAuthService) {
+        function BackandService(BackandAuthService, BackandUserService) {
             var self = this;
 
             self.EVENTS = EVENTS;
@@ -214,40 +214,15 @@ angular.module('backand', ['ngCookies'])
 
 
             self.getUserDetails = function (force) {
-                var deferred = $q.defer();
-                if (force) {
-                    http({
-                        method: 'GET',
-                        url: config.apiUrl + '/api/account/profile'
-                    })
-                        .success(function (profile) {
-                            BKStorage.user.set(profile);
-                            deferred.resolve(BKStorage.user.get());
-                        })
-                } else {
-                    deferred.resolve(BKStorage.user.get());
-                }
-                return deferred.promise;
+                return BackandUserService.getUserDetails(force)
             };
 
             self.getUsername = function () {
-                var userDetails = BKStorage.user.get();
-                if (userDetails) {
-                    return userDetails.username;
-                }
-                else {
-                    return null;
-                }
+                return BackandUserService.getUsername();
             };
 
             self.getUserRole = function () {
-                var userDetails = BKStorage.user.get();
-                if (userDetails) {
-                    return userDetails.role;
-                }
-                else {
-                    return null;
-                }
+                return BackandUserService.getUserRole();
             };
 
             self.getToken = function() {
@@ -535,9 +510,9 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
 }
 ;(function () {
-    angular.module('backand').service('BackandHttpBufferService', ['$injector', HttpBufferService]);
+    angular.module('backand').service('BackandHttpBufferService', HttpBufferService);
 
-        function HttpBufferService($injector) {
+        function HttpBufferService() {
         var self = this;
         var buffer = [];
 
@@ -583,4 +558,37 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
     }
 
 })();
+;angular.module('backand').service('BackandUserService', ['$q', BackandUserService]);
+
+function BackandUserService ($q) {
+    var self = this;
+
+    self.getUserDetails = function (force) {
+        var deferred = $q.defer();
+        if (force) {
+            http({
+                method: 'GET',
+                url: config.apiUrl + '/api/account/profile'
+            })
+                .success(function (profile) {
+                    BKStorage.user.set(profile);
+                    deferred.resolve(BKStorage.user.get());
+                })
+        } else {
+            deferred.resolve(BKStorage.user.get());
+        }
+        return deferred.promise;
+    };
+
+    self.getUsername = function () {
+        var userDetails;
+        return (userDetails = BKStorage.user.get()) ? userDetails.username : null;
+    };
+
+    self.getUserRole = function () {
+        var userDetails;
+        return (userDetails = BKStorage.user.get()) ? userDetails.role : null;
+    };
+
+}
 })();

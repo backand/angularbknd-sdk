@@ -1,6 +1,6 @@
 'use strict';
 
-angular.module('backand', ['ngCookies'])
+angular.module('backand', [])
     .provider('Backand', function () {
 
         // Provider functions (should be called on module config block)
@@ -43,12 +43,12 @@ angular.module('backand', ['ngCookies'])
         };
 
         // $get returns the service
-        this.$get = ['$q', 'BackandAuthService', function ($q, BackandAuthService) {
-            return new BackandService($q, BackandAuthService);
+        this.$get = ['BackandAuthService', 'BackandUserService', function (BackandAuthService, BackandUserService) {
+            return new BackandService(BackandAuthService, BackandUserService);
         }];
 
         // Backand Service
-        function BackandService($q, BackandAuthService) {
+        function BackandService(BackandAuthService, BackandUserService) {
             var self = this;
 
             self.EVENTS = EVENTS;
@@ -101,40 +101,15 @@ angular.module('backand', ['ngCookies'])
 
 
             self.getUserDetails = function (force) {
-                var deferred = $q.defer();
-                if (force) {
-                    http({
-                        method: 'GET',
-                        url: config.apiUrl + '/api/account/profile'
-                    })
-                        .success(function (profile) {
-                            BKStorage.user.set(profile);
-                            deferred.resolve(BKStorage.user.get());
-                        })
-                } else {
-                    deferred.resolve(BKStorage.user.get());
-                }
-                return deferred.promise;
+                return BackandUserService.getUserDetails(force)
             };
 
             self.getUsername = function () {
-                var userDetails = BKStorage.user.get();
-                if (userDetails) {
-                    return userDetails.username;
-                }
-                else {
-                    return null;
-                }
+                return BackandUserService.getUsername();
             };
 
             self.getUserRole = function () {
-                var userDetails = BKStorage.user.get();
-                if (userDetails) {
-                    return userDetails.role;
-                }
-                else {
-                    return null;
-                }
+                return BackandUserService.getUserRole();
             };
 
             self.getToken = function() {

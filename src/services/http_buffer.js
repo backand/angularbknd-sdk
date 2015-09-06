@@ -1,7 +1,7 @@
 (function () {
-    angular.module('backand').service('BackandHttpBufferService', ['$injector', HttpBufferService]);
+    angular.module('backand').service('BackandHttpBufferService', HttpBufferService);
 
-        function HttpBufferService($injector) {
+        function HttpBufferService() {
         var self = this;
         var buffer = [];
 

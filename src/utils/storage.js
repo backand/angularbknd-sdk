@@ -1,9 +1,9 @@
-var BKStorage = (function(){
+var BKStorage = (function () {
     'use strict';
 
     var prefix = 'BACKAND';
 
-    function Store(storeName, type){
+    function Store (storeName, type) {
 
         var storageAPI;
 
@@ -12,7 +12,7 @@ var BKStorage = (function(){
         if (typeof window !== 'undefined' && typeof window[type + 'Storage'] !== 'undefined') {
             storageAPI = window[type + 'Storage'];
         } else {
-            // We can fallback to other solution here inMemory Mangement
+            // We can fallback to other solution here inMemory Management
             // It could be cookies if needed
             storageAPI = {
                 value: null,
@@ -24,7 +24,7 @@ var BKStorage = (function(){
                 },
                 removeItem: function (name, params) {
                     this.value = null;
-                },
+                }
             };
         }
 
@@ -47,7 +47,7 @@ var BKStorage = (function(){
     };
 
     return {
-        register: function(storeName, type) {
+        register: function (storeName, type) {
             if(!storeName) {
                 throw Error('Invalid Store Name');
             }
@@ -55,7 +55,7 @@ var BKStorage = (function(){
             return this;
         },
 
-        remove: function(storeName) {
+        remove: function (storeName) {
             this[storeName].command('remove');
             delete this[storeName];
             return this;

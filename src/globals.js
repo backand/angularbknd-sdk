@@ -5,7 +5,7 @@ var config = {
     tokenName: 'backand_token',
     anonymousToken: null,
     signUpToken: null,
-    isManagingDefaultHeaders: false,
+    isManagingDefaultHeaders: true,
     appName: null,
     userProfileName: 'backand_user'
 };
