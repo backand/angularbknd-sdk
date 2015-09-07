@@ -62,6 +62,7 @@ var BKStorage = (function () {
             return this;
         }
     };
+
 })();
 ;var http;
 
@@ -152,21 +153,21 @@ angular.module('backand', [])
         };
 
         // deprecated
-        this.manageDefaultHeaders = function(isManagingDefaultHeaders) {
+        this.manageDefaultHeaders = function (isManagingDefaultHeaders) {
             return this;
         };
 
-        this.manageHttpInterceptor = function(isManagingHttpInterceptor) {
+        this.manageHttpInterceptor = function (isManagingHttpInterceptor) {
             config.isManagingHttpInterceptor = isManagingHttpInterceptor == undefined ? true : isManagingHttpInterceptor;
             return this;
         };
 
-        this.manageRefreshToken = function(isManagingRefreshToken) {
+        this.manageRefreshToken = function (isManagingRefreshToken) {
             config.isManagingRefreshToken = isManagingRefreshToken == undefined ? true : isManagingRefreshToken;
             return this;
         };
 
-        this.runSigninAfterSignup = function(runSigninAfterSignup) {
+        this.runSigninAfterSignup = function (runSigninAfterSignup) {
             config.runSigninAfterSignup = runSigninAfterSignup == undefined ? true : runSigninAfterSignup;
             return this;
         };
@@ -186,11 +187,11 @@ angular.module('backand', [])
                 config.appName = appName;
             };
 
-            self.signin = function(username, password) {
+            self.signin = function (username, password) {
                 return BackandAuthService.signin(username, password)
             };
 
-            self.signout = function() {
+            self.signout = function () {
                 return BackandAuthService.signout();
             };
 
@@ -210,15 +211,15 @@ angular.module('backand', [])
                 return BackandAuthService.socialSignup(provider, parameters, spec)
             };
 
-            self.requestResetPassword = function(email) {
+            self.requestResetPassword = function (email) {
                 return BackandAuthService.requestResetPassword(email);
             };
 
-            self.resetPassword = function(newPassword, resetToken) {
+            self.resetPassword = function (newPassword, resetToken) {
                 return BackandAuthService.resetPassword(newPassword, resetToken);
             };
 
-            self.changePassword = function(oldPassword, newPassword) {
+            self.changePassword = function (oldPassword, newPassword) {
                 return BackandAuthService.changePassword(oldPassword, newPassword)
             };
 
@@ -235,11 +236,11 @@ angular.module('backand', [])
                 return BackandUserService.getUserRole();
             };
 
-            self.getToken = function() {
+            self.getToken = function () {
                 return BKStorage.token.get();
             };
 
-            self.getTokenName = function() {
+            self.getTokenName = function () {
                 return config.tokenName;
             };
 
@@ -265,8 +266,8 @@ angular.module('backand', [])
             self.socialSignUp = self.socialSignup;
         }
     })
-    .run(['$injector', function($injector) {
-        $injector.invoke(['$http', function($http) {
+    .run(['$injector', function ($injector) {
+        $injector.invoke(['$http', function ($http) {
             // Cannot inject http to provider, so doing it here:
             http = $http;
         }]);
