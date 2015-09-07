@@ -8,7 +8,7 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
     return {
         request: function(httpConfig) {
             // Exclusions
-            if (!Backand.isManagingDefaultHeaders()) return httpConfig;
+            if (!config.isManagingHttpInterceptor) return httpConfig;
             if (!httpConfig.url.match(Backand.getApiUrl())) return httpConfig;
             if (httpConfig.url.match(Backand.getApiUrl() + '/token')) return httpConfig;
 
@@ -22,8 +22,12 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
             return httpConfig;
         },
         responseError: function (rejection) {
+            if (!config.isManagingHttpInterceptor) return rejection;
             if (rejection.config.url !== Backand.getApiUrl() + 'token') {
-                if (rejection.status === 401) {
+                if (config.isManagingRefreshToken
+                    && rejection.status === 401
+                    && rejection.data
+                    && rejection.data.Message === 'invalid or expired token') {
 
                     BackandAuthService.refreshToken(Backand.getUsername());
                     var deferred = $q.defer();

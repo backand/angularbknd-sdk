@@ -6,7 +6,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
     // basic authentication
 
-    self.signin = function(username, password) {
+    self.signin = function (username, password) {
         var userData = {
             grant_type: 'password',
             username: username,
@@ -44,13 +44,26 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
             }
         ).then(function (response) {
                 $rootScope.$broadcast(EVENTS.SIGNUP);
-                return response;
+                if (config.runSigninAfterSignup) {
+                    return self.signin(email, password);
+                } else {
+                    return response;
+                }
             })
     };
 
     // social authentication
+    self.socialSignin = function (provider, spec) {
+        return socialAuth(provider, false, spec);
+    };
 
-    self.socialAuth = function (provider, isSignUp, spec) {
+    self.socialSignup = function (provider, parameters, spec) {
+        self.signupParameters = parameters;
+        self.inSocialSignup = true;
+        return socialAuth(provider, true, spec);
+    };
+
+    function socialAuth (provider, isSignUp, spec) {
         if (!socialProviders[provider]) {
             throw Error('Unknown Social Provider');
         }
@@ -67,7 +80,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
         window.addEventListener('message', setUserDataFromToken, false);
         return self.loginPromise.promise;
-    };
+    }
 
     function setUserDataFromToken (event) {
         self.socialAuthWindow.close();
@@ -84,7 +97,11 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
             self.loginPromise.reject(rejection);
 
         } else if (userData.data) {
-            return self.signinWithToken(userData.data);
+            if (self.inSocialSignup) {
+                self.inSocialSignup = false;
+                $rootScope.$broadcast(EVENTS.SIGNUP);
+            }
+            return signinWithToken(userData.data);
 
         } else {
             self.loginPromise.reject();
@@ -93,14 +110,20 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
     // tokens authentication
 
-    self.signinWithToken = function (userData) {
+    function signinWithToken (userData) {
         var tokenData = {
             grant_type: 'password',
             accessToken: userData.access_token,
             appName: config.appName
         };
+
+        if (self.signupParameters) {
+            tokenData.parameters = self.signupParameters;
+            self.signupParameters = null;
+        }
+
         return authenticate(tokenData)
-    };
+    }
 
     self.refreshToken = function (username) {
         BKStorage.token.clear();
@@ -119,7 +142,6 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
         };
         return authenticate(tokenData);
     };
-
 
 
     function authenticate (authData) {
@@ -176,12 +198,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
     // password management
 
-    self.requestResetPassword = function(email, appName) {
-
-        if (appName) {
-            self.setAppName(appName);
-        }
-
+    self.requestResetPassword = function (email) {
         return http({
                 method: 'POST',
                 url: config.apiUrl + '/1/user/requestResetPassword',
@@ -193,7 +210,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
         )
     };
 
-    self.resetPassword = function(newPassword, resetToken) {
+    self.resetPassword = function (newPassword, resetToken) {
         return http({
             method: 'POST',
             url: config.apiUrl + '/1/user/resetPassword',
@@ -204,7 +221,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
         });
     };
 
-    self.changePassword = function(oldPassword, newPassword) {
+    self.changePassword = function (oldPassword, newPassword) {
         return http({
             method: 'POST',
             url: config.apiUrl + '/1/user/changePassword',

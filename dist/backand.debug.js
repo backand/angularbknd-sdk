@@ -62,7 +62,6 @@ var BKStorage = (function () {
             return this;
         }
     };
-
 })();
 ;var http;
 
@@ -71,7 +70,9 @@ var config = {
     tokenName: 'backand_token',
     anonymousToken: null,
     signUpToken: null,
-    isManagingDefaultHeaders: true,
+    isManagingHttpInterceptor: true,
+    isManagingRefreshToken: true,
+    runSigninAfterSignup: true,
     appName: null,
     userProfileName: 'backand_user'
 };
@@ -150,8 +151,23 @@ angular.module('backand', [])
             return this;
         };
 
+        // deprecated
         this.manageDefaultHeaders = function(isManagingDefaultHeaders) {
-            config.isManagingDefaultHeaders = isManagingDefaultHeaders == undefined ? true : isManagingDefaultHeaders;
+            return this;
+        };
+
+        this.manageHttpInterceptor = function(isManagingHttpInterceptor) {
+            config.isManagingHttpInterceptor = isManagingHttpInterceptor == undefined ? true : isManagingHttpInterceptor;
+            return this;
+        };
+
+        this.manageRefreshToken = function(isManagingRefreshToken) {
+            config.isManagingRefreshToken = isManagingRefreshToken == undefined ? true : isManagingRefreshToken;
+            return this;
+        };
+
+        this.runSigninAfterSignup = function(runSigninAfterSignup) {
+            config.runSigninAfterSignup = runSigninAfterSignup == undefined ? true : runSigninAfterSignup;
             return this;
         };
 
@@ -170,10 +186,7 @@ angular.module('backand', [])
                 config.appName = appName;
             };
 
-            self.signin = function(username, password, appName) {
-                if (appName) {
-                    self.setAppName(appName);
-                }
+            self.signin = function(username, password) {
                 return BackandAuthService.signin(username, password)
             };
 
@@ -190,18 +203,15 @@ angular.module('backand', [])
             };
 
             self.socialSignin = function (provider, spec) {
-                return BackandAuthService.socialAuth(provider, false, spec)
+                return BackandAuthService.socialSignin(provider, spec)
             };
 
-            self.socialSignup = function (provider, spec) {
-                return BackandAuthService.socialAuth(provider, true, spec)
+            self.socialSignup = function (provider, parameters, spec) {
+                return BackandAuthService.socialSignup(provider, parameters, spec)
             };
 
-            self.requestResetPassword = function(email, appName) {
-                if (appName) {
-                    self.setAppName(appName);
-                }
-                return BackandAuthService.requestResetPassword(email, appName);
+            self.requestResetPassword = function(email) {
+                return BackandAuthService.requestResetPassword(email);
             };
 
             self.resetPassword = function(newPassword, resetToken) {
@@ -237,14 +247,22 @@ angular.module('backand', [])
                 return config.apiUrl;
             };
 
+            // deprecated
             self.isManagingDefaultHeaders = function () {
-                return config.isManagingDefaultHeaders;
+                return null;
+            };
+
+            self.isManagingHttpInterceptor = function () {
+                return config.isManagingHttpInterceptor;
+            };
+
+            self.isManagingRefreshToken = function () {
+                return config.isManagingRefreshToken;
             };
 
             // backward compatibility
             self.socialSignIn = self.socialSignin;
             self.socialSignUp = self.socialSignup;
-            self.signInWithToken = self.signinWithToken;
         }
     })
     .run(['$injector', function($injector) {
@@ -263,7 +281,7 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
     return {
         request: function(httpConfig) {
             // Exclusions
-            if (!Backand.isManagingDefaultHeaders()) return httpConfig;
+            if (!config.isManagingHttpInterceptor) return httpConfig;
             if (!httpConfig.url.match(Backand.getApiUrl())) return httpConfig;
             if (httpConfig.url.match(Backand.getApiUrl() + '/token')) return httpConfig;
 
@@ -277,8 +295,12 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
             return httpConfig;
         },
         responseError: function (rejection) {
+            if (!config.isManagingHttpInterceptor) return rejection;
             if (rejection.config.url !== Backand.getApiUrl() + 'token') {
-                if (rejection.status === 401) {
+                if (config.isManagingRefreshToken
+                    && rejection.status === 401
+                    && rejection.data
+                    && rejection.data.Message === 'invalid or expired token') {
 
                     BackandAuthService.refreshToken(Backand.getUsername());
                     var deferred = $q.defer();
@@ -298,7 +320,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
     // basic authentication
 
-    self.signin = function(username, password) {
+    self.signin = function (username, password) {
         var userData = {
             grant_type: 'password',
             username: username,
@@ -336,13 +358,26 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
             }
         ).then(function (response) {
                 $rootScope.$broadcast(EVENTS.SIGNUP);
-                return response;
+                if (config.runSigninAfterSignup) {
+                    return self.signin(email, password);
+                } else {
+                    return response;
+                }
             })
     };
 
     // social authentication
+    self.socialSignin = function (provider, spec) {
+        return socialAuth(provider, false, spec);
+    };
 
-    self.socialAuth = function (provider, isSignUp, spec) {
+    self.socialSignup = function (provider, parameters, spec) {
+        self.signupParameters = parameters;
+        self.inSocialSignup = true;
+        return socialAuth(provider, true, spec);
+    };
+
+    function socialAuth (provider, isSignUp, spec) {
         if (!socialProviders[provider]) {
             throw Error('Unknown Social Provider');
         }
@@ -359,7 +394,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
         window.addEventListener('message', setUserDataFromToken, false);
         return self.loginPromise.promise;
-    };
+    }
 
     function setUserDataFromToken (event) {
         self.socialAuthWindow.close();
@@ -376,7 +411,11 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
             self.loginPromise.reject(rejection);
 
         } else if (userData.data) {
-            return self.signinWithToken(userData.data);
+            if (self.inSocialSignup) {
+                self.inSocialSignup = false;
+                $rootScope.$broadcast(EVENTS.SIGNUP);
+            }
+            return signinWithToken(userData.data);
 
         } else {
             self.loginPromise.reject();
@@ -385,14 +424,20 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
     // tokens authentication
 
-    self.signinWithToken = function (userData) {
+    function signinWithToken (userData) {
         var tokenData = {
             grant_type: 'password',
             accessToken: userData.access_token,
             appName: config.appName
         };
+
+        if (self.signupParameters) {
+            tokenData.parameters = self.signupParameters;
+            self.signupParameters = null;
+        }
+
         return authenticate(tokenData)
-    };
+    }
 
     self.refreshToken = function (username) {
         BKStorage.token.clear();
@@ -411,7 +456,6 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
         };
         return authenticate(tokenData);
     };
-
 
 
     function authenticate (authData) {
@@ -468,12 +512,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
     // password management
 
-    self.requestResetPassword = function(email, appName) {
-
-        if (appName) {
-            self.setAppName(appName);
-        }
-
+    self.requestResetPassword = function (email) {
         return http({
                 method: 'POST',
                 url: config.apiUrl + '/1/user/requestResetPassword',
@@ -485,7 +524,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
         )
     };
 
-    self.resetPassword = function(newPassword, resetToken) {
+    self.resetPassword = function (newPassword, resetToken) {
         return http({
             method: 'POST',
             url: config.apiUrl + '/1/user/resetPassword',
@@ -496,7 +535,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
         });
     };
 
-    self.changePassword = function(oldPassword, newPassword) {
+    self.changePassword = function (oldPassword, newPassword) {
         return http({
             method: 'POST',
             url: config.apiUrl + '/1/user/changePassword',

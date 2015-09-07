@@ -37,8 +37,23 @@ angular.module('backand', [])
             return this;
         };
 
-        this.manageDefaultHeaders = function(isManagingDefaultHeaders) {
-            config.isManagingDefaultHeaders = isManagingDefaultHeaders == undefined ? true : isManagingDefaultHeaders;
+        // deprecated
+        this.manageDefaultHeaders = function (isManagingDefaultHeaders) {
+            return this;
+        };
+
+        this.manageHttpInterceptor = function (isManagingHttpInterceptor) {
+            config.isManagingHttpInterceptor = isManagingHttpInterceptor == undefined ? true : isManagingHttpInterceptor;
+            return this;
+        };
+
+        this.manageRefreshToken = function (isManagingRefreshToken) {
+            config.isManagingRefreshToken = isManagingRefreshToken == undefined ? true : isManagingRefreshToken;
+            return this;
+        };
+
+        this.runSigninAfterSignup = function (runSigninAfterSignup) {
+            config.runSigninAfterSignup = runSigninAfterSignup == undefined ? true : runSigninAfterSignup;
             return this;
         };
 
@@ -57,14 +72,11 @@ angular.module('backand', [])
                 config.appName = appName;
             };
 
-            self.signin = function(username, password, appName) {
-                if (appName) {
-                    self.setAppName(appName);
-                }
+            self.signin = function (username, password) {
                 return BackandAuthService.signin(username, password)
             };
 
-            self.signout = function() {
+            self.signout = function () {
                 return BackandAuthService.signout();
             };
 
@@ -77,25 +89,22 @@ angular.module('backand', [])
             };
 
             self.socialSignin = function (provider, spec) {
-                return BackandAuthService.socialAuth(provider, false, spec)
+                return BackandAuthService.socialSignin(provider, spec)
             };
 
-            self.socialSignup = function (provider, spec) {
-                return BackandAuthService.socialAuth(provider, true, spec)
+            self.socialSignup = function (provider, parameters, spec) {
+                return BackandAuthService.socialSignup(provider, parameters, spec)
             };
 
-            self.requestResetPassword = function(email, appName) {
-                if (appName) {
-                    self.setAppName(appName);
-                }
-                return BackandAuthService.requestResetPassword(email, appName);
+            self.requestResetPassword = function (email) {
+                return BackandAuthService.requestResetPassword(email);
             };
 
-            self.resetPassword = function(newPassword, resetToken) {
+            self.resetPassword = function (newPassword, resetToken) {
                 return BackandAuthService.resetPassword(newPassword, resetToken);
             };
 
-            self.changePassword = function(oldPassword, newPassword) {
+            self.changePassword = function (oldPassword, newPassword) {
                 return BackandAuthService.changePassword(oldPassword, newPassword)
             };
 
@@ -112,11 +121,11 @@ angular.module('backand', [])
                 return BackandUserService.getUserRole();
             };
 
-            self.getToken = function() {
+            self.getToken = function () {
                 return BKStorage.token.get();
             };
 
-            self.getTokenName = function() {
+            self.getTokenName = function () {
                 return config.tokenName;
             };
 
@@ -124,18 +133,26 @@ angular.module('backand', [])
                 return config.apiUrl;
             };
 
+            // deprecated
             self.isManagingDefaultHeaders = function () {
-                return config.isManagingDefaultHeaders;
+                return null;
+            };
+
+            self.isManagingHttpInterceptor = function () {
+                return config.isManagingHttpInterceptor;
+            };
+
+            self.isManagingRefreshToken = function () {
+                return config.isManagingRefreshToken;
             };
 
             // backward compatibility
             self.socialSignIn = self.socialSignin;
             self.socialSignUp = self.socialSignup;
-            self.signInWithToken = self.signinWithToken;
         }
     })
-    .run(['$injector', function($injector) {
-        $injector.invoke(['$http', function($http) {
+    .run(['$injector', function ($injector) {
+        $injector.invoke(['$http', function ($http) {
             // Cannot inject http to provider, so doing it here:
             http = $http;
         }]);
