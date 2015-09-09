@@ -12,9 +12,9 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
             if (!httpConfig.url.match(Backand.getApiUrl())) return httpConfig;
             if (httpConfig.url.match(Backand.getApiUrl() + '/token')) return httpConfig;
 
-            var t = BKStorage.token.get();
-            if (angular.isDefined(t)) {
-                httpConfig.headers['Authorization'] = t;
+            var token = BKStorage.token.get();
+            if (token) {
+                httpConfig.headers['Authorization'] = token;
             }
             if (config.anonymousToken) {
                 httpConfig.headers['AnonymousToken'] = config.anonymousToken;
