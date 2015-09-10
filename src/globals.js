@@ -2,7 +2,6 @@ var http;
 
 var config = {
     apiUrl: "https://api.backand.com",
-    tokenName: 'backand_token',
     anonymousToken: null,
     signUpToken: null,
     isManagingHttpInterceptor: true,

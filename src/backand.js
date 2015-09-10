@@ -13,12 +13,13 @@ angular.module('backand', [])
             return this;
         };
 
-        this.getTokenName = function (newTokenName) {
-            return config.tokenName;
+        // deprecated
+        this.getTokenName = function () {
+            return null;
         };
 
-        this.setTokenName = function (newTokenName) {
-            config.tokenName = newTokenName;
+        // deprecated
+        this.setTokenName = function () {
             return this;
         };
 
