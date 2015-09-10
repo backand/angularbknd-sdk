@@ -258,7 +258,7 @@ angular.module('backand', [])
             };
 
             self.isManagingRefreshToken = function () {
-                return config.isManagingRefreshToken;
+                return config.isManagingRefreshToken && BKStorage.user.get() && BKStorage.user.get().refresh_token;
             };
 
             // backward compatibility
@@ -611,7 +611,7 @@ function BackandUserService ($q) {
                 url: config.apiUrl + '/api/account/profile'
             })
                 .success(function (profile) {
-                    BKStorage.user.set(profile);
+                    BKStorage.user.set(angular.extend(BKStorage.user.get(), profile));
                     deferred.resolve(BKStorage.user.get());
                 })
         } else {

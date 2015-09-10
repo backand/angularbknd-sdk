@@ -11,7 +11,7 @@ function BackandUserService ($q) {
                 url: config.apiUrl + '/api/account/profile'
             })
                 .success(function (profile) {
-                    BKStorage.user.set(profile);
+                    BKStorage.user.set(angular.extend(BKStorage.user.get(), profile));
                     deferred.resolve(BKStorage.user.get());
                 })
         } else {

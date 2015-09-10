@@ -143,7 +143,7 @@ angular.module('backand', [])
             };
 
             self.isManagingRefreshToken = function () {
-                return config.isManagingRefreshToken;
+                return config.isManagingRefreshToken && BKStorage.user.get() && BKStorage.user.get().refresh_token;
             };
 
             // backward compatibility
