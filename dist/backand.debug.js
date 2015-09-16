@@ -98,7 +98,6 @@ function getSocialUrl(providerName, isSignup) {
         '&state=';
 }
 
-
 BKStorage.register('token');
 BKStorage.register('user');
 
@@ -282,33 +281,41 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
     return {
         request: function(httpConfig) {
             // Exclusions
-            if (!config.isManagingHttpInterceptor) return httpConfig;
-            if (!httpConfig.url.match(Backand.getApiUrl())) return httpConfig;
-            if (httpConfig.url.match(Backand.getApiUrl() + '/token')) return httpConfig;
+            if (config.isManagingHttpInterceptor
+                && httpConfig.url.match(Backand.getApiUrl())
+                && !httpConfig.url.match(Backand.getApiUrl() + '/token')) {
 
-            var token = BKStorage.token.get();
-            if (token) {
-                httpConfig.headers['Authorization'] = token;
+                var token = BKStorage.token.get();
+
+                if (token) {
+                    httpConfig.headers['Authorization'] = token;
+                }
+
+                if (config.anonymousToken) {
+                    httpConfig.headers['AnonymousToken'] = config.anonymousToken;
+                }
             }
-            if (config.anonymousToken) {
-                httpConfig.headers['AnonymousToken'] = config.anonymousToken;
-            }
+
             return httpConfig;
         },
+
         responseError: function (rejection) {
-            if (!config.isManagingHttpInterceptor) return rejection;
-            if (rejection.config.url !== Backand.getApiUrl() + 'token') {
-                if (config.isManagingRefreshToken
-                    && rejection.status === 401
-                    && rejection.data
-                    && rejection.data.Message === 'invalid or expired token') {
+
+            if (config.isManagingHttpInterceptor
+                && rejection.config.url !== Backand.getApiUrl() + 'token'
+                && config.isManagingRefreshToken
+                && rejection.status === 401
+                && rejection.data
+                && rejection.data.Message === 'invalid or expired token') {
 
                     BackandAuthService.refreshToken(Backand.getUsername());
+
                     var deferred = $q.defer();
+
                     BackandHttpBufferService.append(rejection.config, deferred);
                     return deferred.promise;
                 }
-            }
+
             return $q.reject(rejection);
         }
     }
@@ -318,6 +325,14 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
 function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
     var self = this;
     var authenticating = false;
+
+    var urls = {
+        signup: '/1/user/signup',
+        token: '/token',
+        requestResetPassword: '/1/user/requestResetPassword',
+        resetPassword: '/1/user/resetPassword',
+        changePassword: '/1/user/changePassword'
+    };
 
     // basic authentication
 
@@ -332,7 +347,6 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
     };
 
     self.signout = function() {
-
         BKStorage.token.clear();
         BKStorage.user.clear();
 
@@ -343,28 +357,29 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
     self.signup = function (firstName, lastName, email, password, confirmPassword, parameters) {
         return http({
-                method: 'POST',
-                url: config.apiUrl + '/1/user/signup',
-                headers: {
-                    'SignUpToken': config.signUpToken
-                },
-                data: {
-                    firstName: firstName,
-                    lastName: lastName,
-                    email: email,
-                    password: password,
-                    confirmPassword: confirmPassword,
-                    parameters: parameters
-                }
+            method: 'POST',
+            url: config.apiUrl + urls.signup,
+            headers: {
+                'SignUpToken': config.signUpToken
+            },
+            data: {
+                firstName: firstName,
+                lastName: lastName,
+                email: email,
+                password: password,
+                confirmPassword: confirmPassword,
+                parameters: parameters
             }
-        ).then(function (response) {
-                $rootScope.$broadcast(EVENTS.SIGNUP);
-                if (config.runSigninAfterSignup) {
-                    return self.signin(email, password);
-                } else {
-                    return response;
-                }
-            })
+        }).then(function (response) {
+            $rootScope.$broadcast(EVENTS.SIGNUP);
+
+            if (config.runSigninAfterSignup
+                && response.data.currentStatus === 1) {
+                return self.signin(email, password);
+            }
+
+            return response;
+        })
     };
 
     // social authentication
@@ -400,8 +415,11 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
     function setUserDataFromToken (event) {
         self.socialAuthWindow.close();
         self.socialAuthWindow = null;
-        if (event.origin !== location.origin)
+
+        if (event.origin !== location.origin) {
             return;
+        }
+
         var userData = JSON.parse(event.data);
         if (userData.error) {
 
@@ -467,7 +485,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
         BKStorage.token.clear();
         return http({
             method: 'POST',
-            url: config.apiUrl + '/token',
+            url: config.apiUrl + urls.token,
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded'
             },
@@ -515,20 +533,19 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
     self.requestResetPassword = function (email) {
         return http({
-                method: 'POST',
-                url: config.apiUrl + '/1/user/requestResetPassword',
-                data: {
-                    appName: config.appName,
-                    username: email
-                }
+            method: 'POST',
+            url: config.apiUrl + urls.requestResetPassword,
+            data: {
+                appName: config.appName,
+                username: email
             }
-        )
+        })
     };
 
     self.resetPassword = function (newPassword, resetToken) {
         return http({
             method: 'POST',
-            url: config.apiUrl + '/1/user/resetPassword',
+            url: config.apiUrl + urls.resetPassword,
             data: {
                 newPassword: newPassword,
                 resetToken: resetToken
@@ -539,7 +556,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
     self.changePassword = function (oldPassword, newPassword) {
         return http({
             method: 'POST',
-            url: config.apiUrl + '/1/user/changePassword',
+            url: config.apiUrl + urls.changePassword,
             data: {
                 oldPassword: oldPassword,
                 newPassword: newPassword

@@ -32,7 +32,6 @@ function getSocialUrl(providerName, isSignup) {
         '&state=';
 }
 
-
 BKStorage.register('token');
 BKStorage.register('user');
 
