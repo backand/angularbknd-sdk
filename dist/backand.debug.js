@@ -239,8 +239,9 @@ angular.module('backand', [])
                 return BKStorage.token.get();
             };
 
+            // deprecated
             self.getTokenName = function () {
-                return config.tokenName;
+                return null;
             };
 
             self.getApiUrl = function () {
