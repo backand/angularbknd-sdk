@@ -3,8 +3,7 @@
   "description": "Backand SDK for Angular",
   "version": "1.7.2",
   "main": [
-    "dist/",
-    "src/"
+    "dist/backand.min.js"
   ],
   "ignore": [
     "Bower/*",
