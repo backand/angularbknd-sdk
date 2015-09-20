@@ -1,14 +1,108 @@
-/*
-* Angular SDK to use with backand 
-* @version 1.7.2 - 2015-08-02
-* @link https://backand.com 
-* @author Itay Herskovits 
-* @license MIT License, http://www.opensource.org/licenses/MIT
- */
 (function () {
+var BKStorage = (function () {
     'use strict';
 
-    // get token or error message from url in social sign-in popup
+    var prefix = 'BACKAND';
+
+    function Store (storeName, type) {
+
+        var storageAPI;
+
+        if( ['local', 'session'].indexOf(type) === -1 ) type = 'local';
+
+        if (typeof window !== 'undefined' && typeof window[type + 'Storage'] !== 'undefined') {
+            storageAPI = window[type + 'Storage'];
+        } else {
+            // We can fallback to other solution here inMemory Management
+            // It could be cookies if needed
+            storageAPI = {
+                value: null,
+                getItem: function (name, params) {
+                    return this.value;
+                },
+                setItem: function (name, params) {
+                    this.value = params;
+                },
+                removeItem: function (name, params) {
+                    this.value = null;
+                }
+            };
+        }
+
+        this.command = function (action, params) {
+            return storageAPI[action + 'Item'](prefix + storeName, params || null);
+        };
+    }
+
+    Store.prototype.get = function () {
+        return JSON.parse(this.command('get'));
+    };
+
+    Store.prototype.set = function (value) {
+        return this.command('set', JSON.stringify(value));
+    };
+
+    Store.prototype.clear = function () {
+        this.command('set');
+        return this;
+    };
+
+    return {
+        register: function (storeName, type) {
+            if(!storeName) {
+                throw Error('Invalid Store Name');
+            }
+            this[storeName] = new Store(storeName, type);
+            return this;
+        },
+
+        remove: function (storeName) {
+            this[storeName].command('remove');
+            delete this[storeName];
+            return this;
+        }
+    };
+
+})();
+;var http;
+
+var config = {
+    apiUrl: "https://api.backand.com",
+    anonymousToken: null,
+    signUpToken: null,
+    isManagingHttpInterceptor: true,
+    isManagingRefreshToken: true,
+    runSigninAfterSignup: true,
+    appName: null,
+    userProfileName: 'backand_user'
+};
+
+var EVENTS = {
+    SIGNIN: 'BackandSignIn',
+    SIGNOUT: 'BackandSignOut',
+    SIGNUP: 'BackandSignUp'
+};
+
+var socialProviders = {
+    github: {name: 'github', label: 'Github', url: 'www.github.com', css: 'github', id: 1},
+    google: {name: 'google', label: 'Google', url: 'www.google.com', css: 'google-plus', id: 2},
+    facebook: {name: 'facebook', label: 'Facebook', url: 'www.facebook.com', css: 'facebook', id: 3}
+};
+
+function getSocialUrl(providerName, isSignup) {
+    var provider = socialProviders[providerName];
+    var action = isSignup ? 'up' : 'in';
+    return 'user/socialSign' + action +
+        '?provider=' + provider.label +
+        '&response_type=token&client_id=self&redirect_uri=' + provider.url +
+        '&state=';
+}
+
+BKStorage.register('token');
+BKStorage.register('user');
+
+// get token or error message from url in social sign-in popup
+(function () {
     var dataRegex = /\?(data|error)=(.+)/;
     var dataMatch = dataRegex.exec(location.href);
     if (dataMatch && dataMatch[1] && dataMatch[2]) {
@@ -16,371 +110,543 @@
         userData[dataMatch[1]] = JSON.parse(decodeURI(dataMatch[2].replace(/#.*/, '')));
         window.opener.postMessage(JSON.stringify(userData), location.origin);
     }
+}());
+;'use strict';
 
-    var cookieStore;
-    var config;
-    var defaultHeaders;
-    var token;
-    var user;
-    var http;
-    angular.module('backand', ['ngCookies'])
-        .provider('Backand', function () {
+angular.module('backand', [])
+    .provider('Backand', function () {
 
-            // Configuration
-            config = {
-                apiUrl: "https://api.backand.com",
-                tokenName: 'backand_token',
-                anonymousToken: null,
-                signUpToken: null,
-                isManagingDefaultHeaders: false,
-                appName: null,
-                userProfileName: 'backand_user'
+        // Provider functions (should be called on module config block)
+        this.getApiUrl = function () {
+            return config.apiUrl;
+        };
+
+        this.setApiUrl = function (newApiUrl) {
+            config.apiUrl = newApiUrl;
+            return this;
+        };
+
+        // deprecated
+        this.getTokenName = function () {
+            return null;
+        };
+
+        // deprecated
+        this.setTokenName = function () {
+            return this;
+        };
+
+        this.setAnonymousToken = function (anonymousToken) {
+            config.anonymousToken = anonymousToken;
+            return this;
+        };
+
+        this.setSignUpToken = function (signUpToken) {
+            config.signUpToken = signUpToken;
+            return this;
+        };
+
+        this.setAppName = function (appName) {
+            config.appName = appName;
+            return this;
+        };
+
+        // deprecated
+        this.manageDefaultHeaders = function (isManagingDefaultHeaders) {
+            return this;
+        };
+
+        this.manageHttpInterceptor = function (isManagingHttpInterceptor) {
+            config.isManagingHttpInterceptor = isManagingHttpInterceptor == undefined ? true : isManagingHttpInterceptor;
+            return this;
+        };
+
+        this.manageRefreshToken = function (isManagingRefreshToken) {
+            config.isManagingRefreshToken = isManagingRefreshToken == undefined ? true : isManagingRefreshToken;
+            return this;
+        };
+
+        this.runSigninAfterSignup = function (runSigninAfterSignup) {
+            config.runSigninAfterSignup = runSigninAfterSignup == undefined ? true : runSigninAfterSignup;
+            return this;
+        };
+
+        // $get returns the service
+        this.$get = ['BackandAuthService', 'BackandUserService', function (BackandAuthService, BackandUserService) {
+            return new BackandService(BackandAuthService, BackandUserService);
+        }];
+
+        // Backand Service
+        function BackandService(BackandAuthService, BackandUserService) {
+            var self = this;
+
+            self.EVENTS = EVENTS;
+
+            self.setAppName = function (appName) {
+                config.appName = appName;
             };
 
-            // Token
-            token = {
-                get: function() {
-                    return cookieStore.get(config.tokenName);
-                },
-                set: function(_token) {
-                    cookieStore.put(config.tokenName, _token);
-                },
-                remove: function () {
-                    cookieStore.remove(config.tokenName);
-                }
+            self.signin = function (username, password) {
+                return BackandAuthService.signin(username, password)
             };
 
-            // Current User
-            user = {
-                get: function() {
-                    return cookieStore.get(config.userProfileName);
-                },
-                set: function(_user) {
-                    cookieStore.put(config.userProfileName, _user);
-                },
-                remove: function () {
-                    cookieStore.remove(config.userProfileName);
-                }
+            self.signout = function () {
+                return BackandAuthService.signout();
             };
 
-            // Default headers
-            defaultHeaders = {
-                // set default Authorization header for all future $http calls
-                set: function() {
-                    if (!config.isManagingDefaultHeaders) return;
-                    var t = token.get();
-                    if(angular.isDefined(t)){
-                        http.defaults.headers.common['Authorization'] = t;
-                    }
-                    if (config.anonymousToken) {
-                        http.defaults.headers.common['AnonymousToken'] = config.anonymousToken;
-                    }
-                },
-
-                // clear default Authorization header for all future $http calls
-                clear: function() {
-                    if (!config.isManagingDefaultHeaders) return;
-                    if (http.defaults.headers.common['Authorization']) {
-                        delete http.defaults.headers.common['Authorization'];
-                    }
-                    if (http.defaults.headers.common['AnonymousToken']) {
-                        delete http.defaults.headers.common['AnonymousToken'];
-                    }
-                }
+            self.signup = function (firstName, lastName, email, password, confirmPassword, parameters) {
+                return BackandAuthService.signup(firstName, lastName, email, password, confirmPassword, parameters);
             };
 
-            // Provider functions (should be called on module config block)
-            this.getApiUrl = function () {
+            self.getSocialProviders = function () {
+                return socialProviders;
+            };
+
+            self.socialSignin = function (provider, spec) {
+                return BackandAuthService.socialSignin(provider, spec)
+            };
+
+            self.socialSignup = function (provider, parameters, spec) {
+                return BackandAuthService.socialSignup(provider, parameters, spec)
+            };
+
+            self.requestResetPassword = function (email) {
+                return BackandAuthService.requestResetPassword(email);
+            };
+
+            self.resetPassword = function (newPassword, resetToken) {
+                return BackandAuthService.resetPassword(newPassword, resetToken);
+            };
+
+            self.changePassword = function (oldPassword, newPassword) {
+                return BackandAuthService.changePassword(oldPassword, newPassword)
+            };
+
+
+            self.getUserDetails = function (force) {
+                return BackandUserService.getUserDetails(force)
+            };
+
+            self.getUsername = function () {
+                return BackandUserService.getUsername();
+            };
+
+            self.getUserRole = function () {
+                return BackandUserService.getUserRole();
+            };
+
+            self.getToken = function () {
+                return BKStorage.token.get();
+            };
+
+            // deprecated
+            self.getTokenName = function () {
+                return null;
+            };
+
+            self.getApiUrl = function () {
                 return config.apiUrl;
             };
-            this.setApiUrl = function (newApiUrl) {
-                config.apiUrl = newApiUrl;
-                return this;
-            };
-            this.getTokenName = function (newTokenName) {
-                return config.tokenName;
-            };
-            this.setTokenName = function (newTokenName) {
-                config.tokenName = newTokenName;
-                return this;
-            };
-            this.setAnonymousToken = function (anonymousToken) {
-                config.anonymousToken = anonymousToken;
-                return this;
+
+            // deprecated
+            self.isManagingDefaultHeaders = function () {
+                return null;
             };
 
-            this.setSignUpToken = function (signUpToken) {
-                config.signUpToken = signUpToken;
-                return this;
+            self.isManagingHttpInterceptor = function () {
+                return config.isManagingHttpInterceptor;
             };
 
-            this.setAppName = function (appName) {
-                config.appName = appName;
-                return this;
+            self.isManagingRefreshToken = function () {
+                return config.isManagingRefreshToken && BKStorage.user.get() && BKStorage.user.get().refresh_token;
             };
 
-            this.manageDefaultHeaders = function(isManagingDefaultHeaders) {
-                if (isManagingDefaultHeaders == undefined) isManagingDefaultHeaders = true
-                config.isManagingDefaultHeaders = isManagingDefaultHeaders;
-                return this;
-            };
+            // backward compatibility
+            self.socialSignIn = self.socialSignin;
+            self.socialSignUp = self.socialSignup;
+        }
+    })
+    .run(['$injector', function ($injector) {
+        $injector.invoke(['$http', function ($http) {
+            // Cannot inject http to provider, so doing it here:
+            http = $http;
+        }]);
+    }]);
+;angular.module('backand')
+    .factory('BackandHttpInterceptor', ['$q', 'Backand', 'BackandHttpBufferService', 'BackandAuthService', HttpInterceptor])
+    .config(['$httpProvider', function ($httpProvider) {
+        $httpProvider.interceptors.push('BackandHttpInterceptor');
+    }]);
 
-            // $get returns the service
-            this.$get = ['$q', function ($q) {
-                return new BackandService($q);
-            }];
+function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthService) {
+    return {
+        request: function(httpConfig) {
+            // Exclusions
+            if (config.isManagingHttpInterceptor
+                && httpConfig.url.match(Backand.getApiUrl())
+                && !httpConfig.url.match(Backand.getApiUrl() + '/token')) {
 
-            // Backand Service
-            function BackandService($q) {
-                var self = this;
+                var token = BKStorage.token.get();
 
-                self.setAppName = function (appName) {
-                    config.appName = appName;
-                };
-
-                var providers = {
-                    github: {name: 'github', label: 'Github', url: 'www.github.com', css: 'github', id: 1},
-                    google: {name: 'google', label: 'Google', url: 'www.google.com', css: 'google-plus', id: 2},
-                    facebook: {name: 'facebook', label: 'Facebook', url: 'www.facebook.com', css: 'facebook', id: 3}
-                };
-
-                self.getSocialProviders = function () {
-                    return providers;
-                };
-
-                function getSocialUrl(providerName, isSignup) {
-                    var provider = providers[providerName];
-                    var action = isSignup ? 'up' : 'in';
-                    return 'user/socialSign' + action +
-                        '?provider=' + provider.label +
-                        '&response_type=token&client_id=self&redirect_uri=' + provider.url +
-                        '&state=';
+                if (token) {
+                    httpConfig.headers['Authorization'] = token;
                 }
 
-                self.socialSignIn = function (provider) {
-                    return self.socialAuth(provider, false)
-                };
-
-                self.socialSignUp = function (provider) {
-                    return self.socialAuth(provider, true)
-                };
-
-                self.socialAuth = function (provider, isSignUp) {
-                    self.loginPromise = $q.defer();
-
-                    self.socialAuthWindow = window.open(
-                        config.apiUrl + '/1/' +
-                        getSocialUrl(provider, isSignUp) +
-                        '&appname=' + config.appName + '&returnAddress=',
-                        'id1', 'left=10, top=10, width=600, height=600');
-
-                    window.addEventListener('message', setUserDataFromToken, false);
-                    return self.loginPromise.promise;
-                };
-
-                function setUserDataFromToken (event) {
-                    self.socialAuthWindow.close();
-                    self.socialAuthWindow = null;
-                    if (event.origin !== location.origin)
-                        return;
-                    var userData = JSON.parse(event.data);
-                    if (userData.error) {
-                        self.loginPromise.reject({
-                            data: userData.error.message + ' (signing in with ' + userData.error.provider + ')'
-                        });
-                        return;
-                    } else if (userData.data) {
-                        return self.signInWithToken(userData.data);
-                    } else {
-                        self.loginPromise.reject();
-                    }
+                if (config.anonymousToken) {
+                    httpConfig.headers['AnonymousToken'] = config.anonymousToken;
                 }
+            }
 
-                self.signin = function(username, password, appName) {
-                    self.loginPromise = $q.defer();
+            return httpConfig;
+        },
 
-                    if (appName) {
-                        self.setAppName(appName);
-                    }
+        responseError: function (rejection) {
 
-                    var userData = {
-                        grant_type: 'password',
-                        username: username,
-                        password: password,
-                        appname: config.appName
-                    };
-                    return authenticate(userData)
-                };
+            if (config.isManagingHttpInterceptor
+                && rejection.config.url !== Backand.getApiUrl() + 'token'
+                && config.isManagingRefreshToken
+                && rejection.status === 401
+                && rejection.data
+                && rejection.data.Message === 'invalid or expired token') {
 
-                self.signInWithToken = function (userData) {
+                    BackandAuthService.refreshToken(Backand.getUsername());
 
-                    var tokenData = {
-                        grant_type: 'password',
-                        accessToken: userData.access_token,
-                        appName: config.appName
-                    };
-                    return authenticate(tokenData)
-                };
-
-                self.getUserDetails = function (force) {
                     var deferred = $q.defer();
-                    if (force) {
-                        http({
-                            method: 'GET',
-                            url: config.apiUrl + '/api/account/profile'
-                        })
-                            .success(function (profile) {
-                                user.set(profile);
-                                deferred.resolve(user.get());
-                            })
-                    } else {
-                        deferred.resolve(user.get());
-                    }
+
+                    BackandHttpBufferService.append(rejection.config, deferred);
                     return deferred.promise;
-                };
-
-                self.getUsername = function () {
-                    var userDetails = cookieStore.get(config.userProfileName);
-                    if (userDetails) {
-                        return userDetails.username;
-                    }
-                    else {
-                        return null;
-                    }
-                };
-
-                self.getUserRole = function () {
-                    var userDetails = cookieStore.get(config.userProfileName);
-                    if (userDetails) {
-                        return userDetails.role;
-                    }
-                    else {
-                        return null;
-                    }
-                };
-
-                function authenticate (authData) {
-                    token.remove();
-                    defaultHeaders.clear();
-                    http({
-                        method: 'POST',
-                        url: config.apiUrl + '/token',
-                        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                        transformRequest: function (obj) {
-                            var str = [];
-                            angular.forEach(obj, function(value, key){
-                                str.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
-                            });
-                            return str.join("&");
-                        },
-                        data: authData
-                    })
-                        .success(function (data) {
-                            if(angular.isDefined(data) && data != null){
-                                if(angular.isDefined(data.access_token)) {
-                                    config.token = 'bearer ' + data.access_token;
-                                    token.set(config.token);
-                                    defaultHeaders.set();
-                                    user.set(data);
-                                    self.loginPromise.resolve(config.token);
-                                }
-                            }
-                            else {
-                                self.loginPromise.reject('token is undefined');
-                            }
-
-                        })
-                        .error(function (err) {
-                            self.loginPromise.reject(err);
-                        });
-
-                    return self.loginPromise.promise;
                 }
 
-                self.signout = function() {
-                    token.remove();
-                    user.remove();
-                    defaultHeaders.clear();
-                    defaultHeaders.set();
-                    return $q.when(true);
-                };
+            return $q.reject(rejection);
+        }
+    }
+}
+;angular.module('backand').service('BackandAuthService', ['$q', '$rootScope', 'BackandHttpBufferService', BackandAuthService]);
 
-                self.signup = function (firstName, lastName, email, password, confirmPassword) {
-                    return http({
-                            method: 'POST',
-                            url: config.apiUrl + '/1/user/signup',
-                            headers: { 'SignUpToken': config.signUpToken },
-                            data: {
-                                firstName: firstName,
-                                lastName: lastName,
-                                email: email,
-                                password: password,
-                                confirmPassword: confirmPassword
-                            }
-                        }
-                    )
-                };
+function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
+    var self = this;
+    var authenticating = false;
 
-                self.requestResetPassword = function(email, appName) {
+    var urls = {
+        signup: '/1/user/signup',
+        token: '/token',
+        requestResetPassword: '/1/user/requestResetPassword',
+        resetPassword: '/1/user/resetPassword',
+        changePassword: '/1/user/changePassword'
+    };
 
-                    if (appName) {
-                        self.setAppName(appName);
-                    }
+    // basic authentication
 
-                    return http({
-                            method: 'POST',
-                            url: config.apiUrl + '/1/user/requestResetPassword',
-                            data: {
-                                appName: config.appName,
-                                username: email
-                            }
-                        }
-                    )
-                };
+    self.signin = function (username, password) {
+        var userData = {
+            grant_type: 'password',
+            username: username,
+            password: password,
+            appname: config.appName
+        };
+        return authenticate(userData)
+    };
 
-                self.resetPassword = function(newPassword, resetToken) {
-                    return http({
-                        method: 'POST',
-                        url: config.apiUrl + '/1/user/resetPassword',
-                        data: {
-                            newPassword: newPassword,
-                            resetToken: resetToken
-                        }
-                    });
-                };
+    self.signout = function() {
+        BKStorage.token.clear();
+        BKStorage.user.clear();
 
-                self.changePassword = function(oldPassword, newPassword) {
-                    return http({
-                        method: 'POST',
-                        url: config.apiUrl + '/1/user/changePassword',
-                        data: {
-                            oldPassword: oldPassword,
-                            newPassword: newPassword
-                        }
-                    });
-                };
+        BackandHttpBufferService.rejectAll('signed out');
+        $rootScope.$broadcast(EVENTS.SIGNOUT);
+        return $q.when(true);
+    };
 
-                self.getToken = function() {
-                    return token.get();
-                };
+    self.signup = function (firstName, lastName, email, password, confirmPassword, parameters) {
+        return http({
+            method: 'POST',
+            url: config.apiUrl + urls.signup,
+            headers: {
+                'SignUpToken': config.signUpToken
+            },
+            data: {
+                firstName: firstName,
+                lastName: lastName,
+                email: email,
+                password: password,
+                confirmPassword: confirmPassword,
+                parameters: parameters
+            }
+        }).then(function (response) {
+            $rootScope.$broadcast(EVENTS.SIGNUP);
 
-                self.getTokenName = function() {
-                    return config.tokenName;
-                };
+            if (config.runSigninAfterSignup
+                && response.data.currentStatus === 1) {
+                return self.signin(email, password);
+            }
 
-                self.getApiUrl = function () {
-                    return config.apiUrl;
-                };
+            return response;
+        })
+    };
+
+    // social authentication
+    self.socialSignin = function (provider, spec) {
+        return socialAuth(provider, false, spec);
+    };
+
+    self.socialSignup = function (provider, parameters, spec) {
+        self.signupParameters = parameters;
+        self.inSocialSignup = true;
+        return socialAuth(provider, true, spec);
+    };
+
+    function socialAuth (provider, isSignUp, spec) {
+        if (!socialProviders[provider]) {
+            throw Error('Unknown Social Provider');
+        }
+
+        self.loginPromise = $q.defer();
+
+        self.socialAuthWindow = window.open(
+            config.apiUrl + '/1/'
+            + getSocialUrl(provider, isSignUp)
+            + '&appname=' + config.appName
+            + '&returnAddress=',
+            'id1',
+            spec || 'left=1, top=1, width=600, height=600');
+
+        window.addEventListener('message', setUserDataFromToken, false);
+        return self.loginPromise.promise;
+    }
+
+    function setUserDataFromToken (event) {
+        self.socialAuthWindow.close();
+        self.socialAuthWindow = null;
+
+        if (event.origin !== location.origin) {
+            return;
+        }
+
+        var userData = JSON.parse(event.data);
+        if (userData.error) {
+
+            var rejection = {
+                data: userData.error.message + ' (signing in with ' + userData.error.provider + ')'
+            };
+            rejection.error_description = rejection.data;
+            self.loginPromise.reject(rejection);
+
+        } else if (userData.data) {
+            if (self.inSocialSignup) {
+                self.inSocialSignup = false;
+                $rootScope.$broadcast(EVENTS.SIGNUP);
+            }
+            return signinWithToken(userData.data);
+
+        } else {
+            self.loginPromise.reject();
+        }
+    }
+
+    // tokens authentication
+
+    function signinWithToken (userData) {
+        var tokenData = {
+            grant_type: 'password',
+            accessToken: userData.access_token,
+            appName: config.appName
+        };
+
+        if (self.signupParameters) {
+            tokenData.parameters = self.signupParameters;
+            self.signupParameters = null;
+        }
+
+        return authenticate(tokenData)
+    }
+
+    self.refreshToken = function (username) {
+        BKStorage.token.clear();
+
+        var user = BKStorage.user.get();
+        var refreshToken;
+        if (!user || !(refreshToken = BKStorage.user.get().refresh_token)) {
+            return;
+        }
+
+        var tokenData = {
+            grant_type: 'password',
+            refreshToken: refreshToken,
+            username: username,
+            appName: config.appName
+        };
+        return authenticate(tokenData);
+    };
+
+
+    function authenticate (authData) {
+        if (authenticating) {
+            return;
+        }
+        authenticating = true;
+        BKStorage.token.clear();
+        return http({
+            method: 'POST',
+            url: config.apiUrl + urls.token,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            transformRequest: function (obj) {
+                var str = [];
+                angular.forEach(obj, function(value, key){
+                    str.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
+                });
+                return str.join("&");
+            },
+            data: authData
+
+        }).then(function (response) {
+            if (response.data && response.data.access_token) {
+                config.token = 'bearer ' + response.data.access_token;
+
+                BKStorage.token.set(config.token);
+                BKStorage.user.set(response.data);
+
+                if (self.loginPromise) {
+                    self.loginPromise.resolve(config.token);
+                }
+
+                BackandHttpBufferService.retryAll();
+                $rootScope.$broadcast(EVENTS.SIGNIN);
+
+            } else if (self.loginPromise) {
+                self.loginPromise.reject('token is undefined');
+            }
+            return response.data;
+
+        }).catch(function (err) {
+            if (self.loginPromise) {
+                self.loginPromise.reject(err);
+            }
+            return $q.reject(err.data);
+
+        }).finally(function () {
+            authenticating = false;
+        });
+    }
+
+
+    // password management
+
+    self.requestResetPassword = function (email) {
+        return http({
+            method: 'POST',
+            url: config.apiUrl + urls.requestResetPassword,
+            data: {
+                appName: config.appName,
+                username: email
             }
         })
-        .run(['$injector', '$location', function($injector, $location) {
-            $injector.invoke(['$http', '$cookieStore', function($http, $cookieStore) {
-                // Cannot inject cookieStore and http to provider, so doing it here:
-                cookieStore = $cookieStore;
-                http = $http;
-            }]);
-            // On load - set default headers from cookie (if managing default headers)
-            defaultHeaders.set();
-        }]);
+    };
 
+    self.resetPassword = function (newPassword, resetToken) {
+        return http({
+            method: 'POST',
+            url: config.apiUrl + urls.resetPassword,
+            data: {
+                newPassword: newPassword,
+                resetToken: resetToken
+            }
+        });
+    };
+
+    self.changePassword = function (oldPassword, newPassword) {
+        return http({
+            method: 'POST',
+            url: config.apiUrl + urls.changePassword,
+            data: {
+                oldPassword: oldPassword,
+                newPassword: newPassword
+            }
+        });
+    };
+
+
+}
+;(function () {
+    angular.module('backand').service('BackandHttpBufferService', HttpBufferService);
+
+        function HttpBufferService() {
+        var self = this;
+        var buffer = [];
+
+        function retryHttpRequest(config, deferred) {
+            function successCallback(response) {
+                deferred.resolve(response);
+            }
+            function errorCallback(response) {
+                deferred.reject(response);
+            }
+
+            http(config).then(successCallback, errorCallback);
+        }
+
+        self.append = function (config, deferred) {
+            buffer.push({
+                config: config,
+                deferred: deferred
+            });
+        };
+
+        self.rejectAll = function (reason) {
+            if (reason) {
+                for (var i = 0; i < buffer.length; ++i) {
+                    buffer[i].deferred.reject(reason);
+                }
+            }
+            buffer = [];
+        };
+
+        function updater (config) {
+            delete config.headers.Authorization;
+            return config;
+        }
+
+        self.retryAll = function () {
+            for (var i = 0; i < buffer.length; ++i) {
+                retryHttpRequest(updater(buffer[i].config), buffer[i].deferred);
+            }
+            buffer = [];
+        }
+
+    }
+
+})();
+;angular.module('backand').service('BackandUserService', ['$q', BackandUserService]);
+
+function BackandUserService ($q) {
+    var self = this;
+
+    self.getUserDetails = function (force) {
+        var deferred = $q.defer();
+        if (force) {
+            http({
+                method: 'GET',
+                url: config.apiUrl + '/api/account/profile'
+            })
+                .success(function (profile) {
+                    BKStorage.user.set(angular.extend(BKStorage.user.get(), profile));
+                    deferred.resolve(BKStorage.user.get());
+                })
+        } else {
+            deferred.resolve(BKStorage.user.get());
+        }
+        return deferred.promise;
+    };
+
+    self.getUsername = function () {
+        var userDetails;
+        return (userDetails = BKStorage.user.get()) ? userDetails.username : null;
+    };
+
+    self.getUserRole = function () {
+        var userDetails;
+        return (userDetails = BKStorage.user.get()) ? userDetails.role : null;
+    };
+
+}
 })();

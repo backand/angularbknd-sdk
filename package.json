@@ -5,6 +5,9 @@
     "grunt": "latest",
     "grunt-contrib-uglify": "latest",
     "grunt-contrib-concat": "latest",
-	"grunt-cli": "latest"
+    "grunt-cli": "latest"
+  },
+  "dependencies": {
+    "grunt-contrib-watch": "^0.6.1"
   }
 }

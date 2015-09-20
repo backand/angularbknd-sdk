@@ -22,12 +22,28 @@ module.exports = function (grunt) {
 
             js: {
                 options: {
+                    banner: '(function () {\n',
+                    footer: '})();\n',
                     separator: ';'
                 },
                 src: [
-                'src/backand.js',
+                    'src/utils/*.js',
+                    'src/globals.js',
+                    'src/backand.js',
+                    'src/*.js',
+                    'src/*/*.js'
                 ],
                 dest: 'dist/<%= pkg.name %>.debug.js'
+            }
+        },
+
+        watch: {
+            scripts: {
+                files: ['src/**/*.js'],
+                tasks: ['concat', 'uglify'],
+                options: {
+                    spawn: false
+                }
             }
         }
 
@@ -37,9 +53,10 @@ module.exports = function (grunt) {
     // Load the plugins
     grunt.loadNpmTasks('grunt-contrib-uglify');
     grunt.loadNpmTasks('grunt-contrib-concat');
+    grunt.loadNpmTasks('grunt-contrib-watch');
 
 
     // Default task(s).
-    grunt.registerTask('default', ['concat', 'uglify']);
+    grunt.registerTask('default', ['concat', 'uglify', 'watch']);
 
 };
