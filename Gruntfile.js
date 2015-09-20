@@ -5,7 +5,7 @@ module.exports = function (grunt) {
         today: grunt.template.today('yyyy-mm-dd'),
         uglify: {
             options: {
-                banner: '/*\n* Angular SDK to use with backand \n* @version <%= pkg.version %> - <%= today %>\n* @link https://backand.com \n* @author Itay Herskovits \n* @license MIT License, http://www.opensource.org/licenses/MIT\n */\n'
+                banner: '/*\n* Angular SDK to use with backand \n* @version <%= pkg.version %> - <%= today %>\n* @link https://www.backand.com \n* @author Itay Herskovits \n* @license MIT License, http://www.opensource.org/licenses/MIT\n */\n'
             },
             js: {
                 src: 'dist/<%= pkg.name %>.debug.js',
@@ -17,7 +17,7 @@ module.exports = function (grunt) {
 
         concat: {
             options: {
-                banner: '/*\n* Angular SDK to use with backand \n* @version <%= pkg.version %> - <%= today %>\n* @link https://backand.com \n* @author Itay Herskovits \n* @license MIT License, http://www.opensource.org/licenses/MIT\n */\n'
+                banner: '/*\n* Angular SDK to use with backand \n* @version <%= pkg.version %> - <%= today %>\n* @link https://www.backand.com \n* @author Itay Herskovits \n* @license MIT License, http://www.opensource.org/licenses/MIT\n */\n'
             },
 
             js: {
