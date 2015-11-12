@@ -109,6 +109,13 @@ angular.module('backand', [])
                 return BackandAuthService.changePassword(oldPassword, newPassword)
             };
 
+            self.setIsMobile = function(val){
+                config.isMobile = val;
+            }
+
+            self.setRunSignupAfterErrorInSigninSocial = function(val){
+                config.callSignupOnSingInSocialError = val;
+            }
 
             self.getUserDetails = function (force) {
                 return BackandUserService.getUserDetails(force)

@@ -7,8 +7,10 @@ var config = {
     isManagingHttpInterceptor: true,
     isManagingRefreshToken: true,
     runSigninAfterSignup: true,
+    callSignupOnSingInSocialError : true, // tell code to run signup after signIn error because user is not registered to application
     appName: null,
-    userProfileName: 'backand_user'
+    userProfileName: 'backand_user',
+    isMobile: false
 };
 
 var EVENTS = {
