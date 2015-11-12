@@ -336,7 +336,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
     var self = this;
     var authenticating = false;
     var NOT_SIGNEDIN_ERROR = 'The user is not signed up to';
-    var dummyReturnAddress = 'http://www.backandAAAA.com';
+    var dummyReturnAddress = 'http://www.backandaaaa.com';
 
     var urls = {
         signup: '/1/user/signup',
