@@ -63,6 +63,11 @@ angular.module('backand', [])
             return this;
         };
 
+        this.runSocket = function (runSocket) {
+          config.runSocket = runSocket == undefined ? false : runSocket;
+          return this;
+        };
+
         // $get returns the service
         this.$get = ['BackandAuthService', 'BackandUserService','BackandSocketService', function (BackandAuthService, BackandUserService, BackandSocketService) {
             return new BackandService(BackandAuthService, BackandUserService, BackandSocketService);
@@ -160,8 +165,14 @@ angular.module('backand', [])
                 return config.isManagingRefreshToken && BKStorage.user.get() && BKStorage.user.get().refresh_token;
             };
 
+            //Socket.io service
+            self.isRunScoket = function () {
+              return config.runScoket;
+            };
+
             self.socketLogin = function(){
-              BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+              if(config.runSocket)
+                BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
             };
 
             self.on = function(eventName, callback){

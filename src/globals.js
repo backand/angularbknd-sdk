@@ -11,7 +11,8 @@ var config = {
     callSignupOnSingInSocialError : true, // tell code to run signup after signIn error because user is not registered to application
     appName: null,
     userProfileName: 'backand_user',
-    isMobile: false
+    isMobile: false,
+    runSocket: false
 };
 
 var EVENTS = {
