@@ -13,6 +13,11 @@ angular.module('backand', [])
             return this;
         };
 
+        this.setSocketUrl = function (newSocketUrl) {
+          config.socketUrl = newSocketUrl;
+          return this;
+        };
+
         // deprecated
         this.getTokenName = function () {
             return null;
@@ -59,12 +64,12 @@ angular.module('backand', [])
         };
 
         // $get returns the service
-        this.$get = ['BackandAuthService', 'BackandUserService', function (BackandAuthService, BackandUserService) {
-            return new BackandService(BackandAuthService, BackandUserService);
+        this.$get = ['BackandAuthService', 'BackandUserService','BackandSocketService', function (BackandAuthService, BackandUserService, BackandSocketService) {
+            return new BackandService(BackandAuthService, BackandUserService, BackandSocketService);
         }];
 
         // Backand Service
-        function BackandService(BackandAuthService, BackandUserService) {
+        function BackandService(BackandAuthService, BackandUserService, BackandSocketService) {
             var self = this;
 
             self.EVENTS = EVENTS;
@@ -153,6 +158,14 @@ angular.module('backand', [])
 
             self.isManagingRefreshToken = function () {
                 return config.isManagingRefreshToken && BKStorage.user.get() && BKStorage.user.get().refresh_token;
+            };
+
+            self.socketLogin = function(){
+              BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+            };
+
+            self.on = function(eventName, callback){
+              BackandSocketService.on(eventName, callback);
             };
 
             // backward compatibility

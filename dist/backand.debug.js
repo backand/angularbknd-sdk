@@ -67,7 +67,8 @@ var BKStorage = (function () {
 ;var http;
 
 var config = {
-    apiUrl: "https://api.backand.com",
+    apiUrl: 'https://api.backand.com',
+    socketUrl: 'https://api.backand.com:4000',
     anonymousToken: null,
     signUpToken: null,
     isManagingHttpInterceptor: true,
@@ -128,6 +129,11 @@ angular.module('backand', [])
             return this;
         };
 
+        this.setSocketUrl = function (newSocketUrl) {
+          config.socketUrl = newSocketUrl;
+          return this;
+        };
+
         // deprecated
         this.getTokenName = function () {
             return null;
@@ -174,12 +180,12 @@ angular.module('backand', [])
         };
 
         // $get returns the service
-        this.$get = ['BackandAuthService', 'BackandUserService', function (BackandAuthService, BackandUserService) {
-            return new BackandService(BackandAuthService, BackandUserService);
+        this.$get = ['BackandAuthService', 'BackandUserService','BackandSocketService', function (BackandAuthService, BackandUserService, BackandSocketService) {
+            return new BackandService(BackandAuthService, BackandUserService, BackandSocketService);
         }];
 
         // Backand Service
-        function BackandService(BackandAuthService, BackandUserService) {
+        function BackandService(BackandAuthService, BackandUserService, BackandSocketService) {
             var self = this;
 
             self.EVENTS = EVENTS;
@@ -270,6 +276,14 @@ angular.module('backand', [])
                 return config.isManagingRefreshToken && BKStorage.user.get() && BKStorage.user.get().refresh_token;
             };
 
+            self.socketLogin = function(){
+              BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+            };
+
+            self.on = function(eventName, callback){
+              BackandSocketService.on(eventName, callback);
+            };
+
             // backward compatibility
             self.socialSignIn = self.socialSignin;
             self.socialSignUp = self.socialSignup;
@@ -330,9 +344,10 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
         }
     }
 }
-;angular.module('backand').service('BackandAuthService', ['$q', '$rootScope', 'BackandHttpBufferService', BackandAuthService]);
+;angular.module('backand')
+    .service('BackandAuthService', ['$q', '$rootScope', 'BackandHttpBufferService','BackandSocketService', BackandAuthService]);
 
-function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
+function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSocketService) {
     var self = this;
     var authenticating = false;
     var NOT_SIGNEDIN_ERROR = 'The user is not signed up to';
@@ -615,6 +630,8 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
                 BackandHttpBufferService.retryAll();
                 $rootScope.$broadcast(EVENTS.SIGNIN);
+                BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+
 
             } else if (self.loginPromise) {
                 self.loginPromise.reject('token is undefined');
@@ -719,7 +736,59 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
     }
 
 })();
-;angular.module('backand').service('BackandUserService', ['$q', BackandUserService]);
+;/**
+ * Created by itay on 11/17/15.
+ */
+angular.module('backand')
+    .service('BackandSocketService', ['$rootScope', BackandSocketService])
+    .run(function(Backand){
+      Backand.socketLogin();
+    });
+
+function BackandSocketService ($rootScope) {
+
+  var self = this;
+
+  self.socket = {on: function(){}}; //io.connect('http://localhost:4000');
+
+  self.login = function(token, anonymousToken, appName, url){
+    self.socket = io.connect(url, {'forceNew':true });
+
+    self.socket.on('connect', function(){
+      console.log('connected');
+      self.socket.emit("login", token, anonymousToken, appName);
+    })
+
+    self.socket.on('disconnect', function() {
+        console.log('disconnect');
+    });
+
+    self.socket.on('reconnecting', function() {
+      console.log('reconnecting');
+    });
+
+  }
+
+  self.on = function (eventName, callback) {
+    self.socket.on(eventName, function () {
+      var args = arguments;
+      $rootScope.$apply(function () {
+        callback.apply(self.socket, args);
+      });
+    });
+  };
+
+  self.emit = function (eventName, data, callback) {
+    self.socket.emit(eventName, data, function () {
+      var args = arguments;
+      $rootScope.$apply(function () {
+        if (callback) {
+          callback.apply(self.socket, args);
+        }
+      });
+    })
+  }
+};angular.module('backand').service('BackandUserService', ['$q', BackandUserService]);
 
 function BackandUserService ($q) {
     var self = this;

@@ -1,6 +1,7 @@
-angular.module('backand').service('BackandAuthService', ['$q', '$rootScope', 'BackandHttpBufferService', BackandAuthService]);
+angular.module('backand')
+    .service('BackandAuthService', ['$q', '$rootScope', 'BackandHttpBufferService','BackandSocketService', BackandAuthService]);
 
-function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
+function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSocketService) {
     var self = this;
     var authenticating = false;
     var NOT_SIGNEDIN_ERROR = 'The user is not signed up to';
@@ -283,6 +284,8 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService) {
 
                 BackandHttpBufferService.retryAll();
                 $rootScope.$broadcast(EVENTS.SIGNIN);
+                BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+
 
             } else if (self.loginPromise) {
                 self.loginPromise.reject('token is undefined');
