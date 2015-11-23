@@ -121,11 +121,11 @@ angular.module('backand', [])
 
             self.setIsMobile = function(val){
                 config.isMobile = val;
-            }
+            };
 
             self.setRunSignupAfterErrorInSigninSocial = function(val){
                 config.callSignupOnSingInSocialError = val;
-            }
+            };
 
             self.getUserDetails = function (force) {
                 return BackandUserService.getUserDetails(force)
@@ -188,5 +188,9 @@ angular.module('backand', [])
         $injector.invoke(['$http', function ($http) {
             // Cannot inject http to provider, so doing it here:
             http = $http;
+        }]);
+        $injector.invoke(['Backand', function (Backand) {
+          // Cannot inject http to provider, so doing it here:
+          Backand.socketLogin();
         }]);
     }]);

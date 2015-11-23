@@ -13,8 +13,6 @@ module.exports = function (grunt) {
             }
 
         },
-
-
         concat: {
             options: {
                 banner: '/*\n* Angular SDK to use with backand \n* @version <%= pkg.version %> - <%= today %>\n* @link https://www.backand.com \n* @author Itay Herskovits \n* @license MIT License, http://www.opensource.org/licenses/MIT\n */\n'

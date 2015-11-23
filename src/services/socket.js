@@ -1,11 +1,8 @@
 /**
- * Created by itay on 11/17/15.
+ * Created by Itay on 11/17/15.
  */
 angular.module('backand')
-    .service('BackandSocketService', ['$rootScope', BackandSocketService])
-    .run(function(Backand){
-      Backand.socketLogin();
-    });
+    .service('BackandSocketService', ['$rootScope', BackandSocketService]);
 
 function BackandSocketService ($rootScope) {
 
@@ -19,7 +16,7 @@ function BackandSocketService ($rootScope) {
     self.socket.on('connect', function(){
       console.log('connected');
       self.socket.emit("login", token, anonymousToken, appName);
-    })
+    });
 
     self.socket.on('disconnect', function() {
         console.log('disconnect');
@@ -29,7 +26,7 @@ function BackandSocketService ($rootScope) {
       console.log('reconnecting');
     });
 
-  }
+  };
 
   self.on = function (eventName, callback) {
     self.socket.on(eventName, function () {
