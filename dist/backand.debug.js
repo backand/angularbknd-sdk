@@ -646,7 +646,9 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
 
                 BackandHttpBufferService.retryAll();
                 $rootScope.$broadcast(EVENTS.SIGNIN);
-                BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+
+                if(config.runSocket)
+                  BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
 
 
             } else if (self.loginPromise) {
