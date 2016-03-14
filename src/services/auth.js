@@ -1,7 +1,7 @@
 angular.module('backand')
-    .service('BackandAuthService', ['$q', '$rootScope', 'BackandHttpBufferService','BackandSocketService', BackandAuthService]);
+    .service('BackandAuthService', ['$q', '$rootScope', 'BackandHttpBufferService', 'BackandSocketService', BackandAuthService]);
 
-function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSocketService) {
+function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSocketService) {
     var self = this;
     var authenticating = false;
     var NOT_SIGNEDIN_ERROR = 'The user is not signed up to';
@@ -12,7 +12,9 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
         token: '/token',
         requestResetPassword: '/1/user/requestResetPassword',
         resetPassword: '/1/user/resetPassword',
-        changePassword: '/1/user/changePassword'
+        changePassword: '/1/user/changePassword',
+        socialLoginWithCode: '/1/user/PROVIDER/code',
+        socialSingupWithCode: '/1/user/PROVIDER/signupCode'
     };
 
     // basic authentication
@@ -27,7 +29,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
         return authenticate(userData)
     };
 
-    self.signout = function() {
+    self.signout = function () {
         BKStorage.token.clear();
         BKStorage.user.clear();
 
@@ -68,12 +70,124 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
         return socialAuth(provider, false, spec);
     };
 
-    self.socialSignup = function (provider, parameters, spec) {
+    self.socialSignup = function (provider, parameters, spec, email) {
         self.signupParameters = parameters;
         self.inSocialSignup = true;
-        return socialAuth(provider, true, spec);
+        return socialAuth(provider, true, spec, email);
     };
 
+    self.socialSigninWithCode = function (provider, returnUrl, code) {
+        if (authenticating) {
+            return;
+        }
+
+        var authData = {
+            "code": code,
+            "clientId": '',
+            "redirectUri": returnUrl,
+            "appName": config.appName
+        }
+
+        authenticating = true;
+        BKStorage.token.clear();
+        return http({
+            method: 'POST',
+            url: config.apiUrl + urls.socialLoginWithCode.replace('PROVIDER', provider),
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            data: authData
+
+        }).then(function (response) {
+            if (response.data && response.data.access_token) {
+                config.token = 'bearer ' + response.data.access_token;
+
+                BKStorage.token.set(config.token);
+                BKStorage.user.set(response.data);
+
+                if (self.loginPromise) {
+                    self.loginPromise.resolve(config.token);
+                }
+
+                BackandHttpBufferService.retryAll();
+                $rootScope.$broadcast(EVENTS.SIGNIN);
+
+                if (config.runSocket)
+                    BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+
+
+            } else if (self.loginPromise) {
+                self.loginPromise.reject('token is undefined');
+            }
+            return response.data;
+
+        }).catch(function (err) {
+            if (self.loginPromise) {
+                self.loginPromise.reject(err);
+            }
+            return $q.reject(err.data);
+
+        }).finally(function () {
+            authenticating = false;
+        });
+    }
+
+    self.socialSignupWithCode = function (provider, returnUrl, code, username, firstname, lastname) {
+        if (!code || !username || !provider) {
+            throw new Error("can't signup without username or code from provider")
+        }
+
+        var authData = {
+            "code": code,
+            "clientId": '',
+            "redirectUri": returnUrl || null,
+            "appName": config.appName,
+            "firstName": firstname || null,
+            "lastName": lastname || null,
+            "userName": username
+        }
+
+        authenticating = true;
+        BKStorage.token.clear();
+        return http({
+            method: 'POST',
+            url: config.apiUrl + urls.socialSingupWithCode.replace('PROVIDER', provider),
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            data: authData
+
+        }).then(function (response) {
+            if (response.data && response.data.access_token) {
+                config.token = 'bearer ' + response.data.access_token;
+
+                BKStorage.token.set(config.token);
+                BKStorage.user.set(response.data);
+
+                if (self.loginPromise) {
+                    self.loginPromise.resolve(config.token);
+                }
+
+                BackandHttpBufferService.retryAll();
+                $rootScope.$broadcast(EVENTS.SIGNIN);
+
+                if (config.runSocket)
+                    BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+
+
+            } else if (self.loginPromise) {
+                self.loginPromise.reject('token is undefined');
+            }
+            return response.data;
+
+        }).catch(function (err) {
+            if (self.loginPromise) {
+                self.loginPromise.reject(err);
+            }
+            return $q.reject(err.data);
+
+        })
+    }
 
     function mobileSocialLoginInner(ref, isSignUp, provider, spec) {
         ref.addEventListener('loadstart', function (e) {
@@ -110,19 +224,21 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
         });
     }
 
-    function socialAuth(provider, isSignUp, spec) {
+    function socialAuth(provider, isSignUp, spec, email) {
+
         if (!socialProviders[provider]) {
             throw Error('Unknown Social Provider');
         }
 
         self.loginPromise = $q.defer();
 
-        if(config.isMobile){
+        if (config.isMobile) {
+
             var ref = window.open(
                 config.apiUrl + '/1/'
                 + getSocialUrl(provider, isSignUp)
-                + '&appname=' + config.appName
-                + '&returnAddress='+ dummyReturnAddress,
+                + '&appname=' + config.appName + (email ? ("&email=" + email) : '')
+                + '&returnAddress=' + dummyReturnAddress,
                 'id1',
                 spec || 'left=1, top=1, width=600, height=600');
 
@@ -132,48 +248,17 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
             self.socialAuthWindow = window.open(
                 config.apiUrl + '/1/'
                 + getSocialUrl(provider, isSignUp)
-                + '&appname=' + config.appName
+                + '&appname=' + config.appName + (email ? ("&email=" + email) : '')
                 + '&returnAddress=',
                 'id1',
                 spec || 'left=1, top=1, width=600, height=600');
 
-            window.addEventListener('message', (function(provider, spec){ return function(e) { setUserDataFromToken(e, provider, spec)}})(provider,spec), false);
-        }
-
-        return self.loginPromise.promise;
-    }
-
-
-    function socialAuth(provider, isSignUp, spec) {
-
-        if (!socialProviders[provider]) {
-            throw Error('Unknown Social Provider');
-        }
-
-        self.loginPromise = $q.defer();
-
-        if(config.isMobile){
-
-            var ref = window.open(
-                config.apiUrl + '/1/'
-                + getSocialUrl(provider, isSignUp)
-                + '&appname=' + config.appName
-                + '&returnAddress='+ dummyReturnAddress,
-                'id1',
-                spec || 'left=1, top=1, width=600, height=600');
-
-            mobileSocialLoginInner(ref, isSignUp, provider, spec);
-        }
-        else {
-            self.socialAuthWindow = window.open(
-                config.apiUrl + '/1/'
-                + getSocialUrl(provider, isSignUp)
-                + '&appname=' + config.appName
-                + '&returnAddress=',
-                'id1',
-                spec || 'left=1, top=1, width=600, height=600');
-
-            window.addEventListener('message', (function(provider, spec){ return function(e) { setUserDataFromToken(e, provider, spec)}})(provider,spec), false);
+            window.addEventListener('message', (function (provider, spec) {
+                    return function (e) {
+                        window.removeEventListener('message', arguments.callee);
+                        setUserDataFromToken(e, provider, spec)
+                    }
+                })(provider, spec), false);
         }
         return self.loginPromise.promise;
     }
@@ -216,7 +301,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
     }
 
     // tokens authentication
-    function signinWithToken (userData) {
+    function signinWithToken(userData) {
         var tokenData = {
             grant_type: 'password',
             accessToken: userData.access_token,
@@ -250,7 +335,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
     };
 
 
-    function authenticate (authData) {
+    function authenticate(authData) {
         if (authenticating) {
             return;
         }
@@ -264,7 +349,7 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
             },
             transformRequest: function (obj) {
                 var str = [];
-                angular.forEach(obj, function(value, key){
+                angular.forEach(obj, function (value, key) {
                     str.push(encodeURIComponent(key) + "=" + encodeURIComponent(value));
                 });
                 return str.join("&");
@@ -285,8 +370,8 @@ function BackandAuthService ($q, $rootScope, BackandHttpBufferService, BackandSo
                 BackandHttpBufferService.retryAll();
                 $rootScope.$broadcast(EVENTS.SIGNIN);
 
-                if(config.runSocket)
-                  BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+                if (config.runSocket)
+                    BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
 
 
             } else if (self.loginPromise) {
