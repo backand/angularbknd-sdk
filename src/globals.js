@@ -24,7 +24,8 @@ var EVENTS = {
 var socialProviders = {
     github: {name: 'github', label: 'Github', url: 'www.github.com', css: 'github', id: 1},
     google: {name: 'google', label: 'Google', url: 'www.google.com', css: 'google-plus', id: 2},
-    facebook: {name: 'facebook', label: 'Facebook', url: 'www.facebook.com', css: 'facebook', id: 3}
+    facebook: {name: 'facebook', label: 'Facebook', url: 'www.facebook.com', css: 'facebook', id: 3},
+    twitter: {name: 'twitter', label: 'Twitter', url: 'www.twitter.com', css: 'twitter', id: 4}
 };
 
 function getSocialUrl(providerName, isSignup) {

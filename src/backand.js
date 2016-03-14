@@ -103,8 +103,8 @@ angular.module('backand', [])
                 return BackandAuthService.socialSignin(provider, spec)
             };
 
-            self.socialSignup = function (provider, parameters, spec) {
-                return BackandAuthService.socialSignup(provider, parameters, spec)
+            self.socialSignup = function (provider, parameters, spec, email) {
+                return BackandAuthService.socialSignup(provider, parameters, spec, email)
             };
 
             self.requestResetPassword = function (email) {
