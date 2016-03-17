@@ -107,6 +107,31 @@ angular.module('backand', [])
                 return BackandAuthService.socialSignup(provider, parameters, spec, email)
             };
 
+            self.socialSignInToken = function(provider, token){
+                return BackandAuthService.socialSigninWithToken(provider, token)
+            }
+
+            self.socialSignInCode = function(provider, code){
+                var returnUrl = window.location.origin;
+
+                if(!provider || !code) {
+                    throw new Error("provide and code have to be valid values");
+                }
+
+                return BackandAuthService.socialSigninWithCode(provider, returnUrl, code);
+            }
+
+
+            self.socialSignUpCode = function(provider, code, username, firstname, lastname){
+                if(!provider || !code) {
+                    throw new Error("provide and code have to be valid values");
+                }
+                var returnUrl = window.location.origin;
+
+                return BackandAuthService.socialSignupWithCode(provider, returnUrl, code,
+                    username, firstname, lastname);
+            }
+
             self.requestResetPassword = function (email) {
                 return BackandAuthService.requestResetPassword(email);
             };

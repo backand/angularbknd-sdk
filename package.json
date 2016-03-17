@@ -1,6 +1,6 @@
 {
   "name": "backand",
-  "version": "1.8.3",
+  "version": "1.8.4",
   "devDependencies": {
     "grunt": "latest",
     "grunt-contrib-uglify": "latest",

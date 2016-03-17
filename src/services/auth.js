@@ -14,7 +14,8 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
         resetPassword: '/1/user/resetPassword',
         changePassword: '/1/user/changePassword',
         socialLoginWithCode: '/1/user/PROVIDER/code',
-        socialSingupWithCode: '/1/user/PROVIDER/signupCode'
+        socialSingupWithCode: '/1/user/PROVIDER/signupCode',
+        socialLoginWithToken: '/1/user/PROVIDER/token'
     };
 
     // basic authentication
@@ -133,8 +134,8 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
     }
 
     self.socialSignupWithCode = function (provider, returnUrl, code, username, firstname, lastname) {
-        if (!code || !username || !provider) {
-            throw new Error("can't signup without username or code from provider")
+        if (!code || !provider) {
+            throw new Error("can't signup without code from provider")
         }
 
         var authData = {
@@ -144,7 +145,7 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
             "appName": config.appName,
             "firstName": firstname || null,
             "lastName": lastname || null,
-            "userName": username
+            "userName": username || null
         }
 
         authenticating = true;
@@ -189,39 +190,101 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
         })
     }
 
+    self.socialSigninWithToken = function (provider, token) {
+        if (authenticating) {
+            return;
+        }
+
+        var url = config.apiUrl + urls.socialLoginWithToken.replace('PROVIDER', provider) + "?accessToken=" + encodeURIComponent(token) + "&appName=" + encodeURI(config.appName);
+        console.log(url);
+        authenticating = true;
+        BKStorage.token.clear();
+        return http({
+            method: 'GET',
+            url: url,
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then(function (response) {
+            if (response.data && response.data.access_token) {
+                config.token = 'bearer ' + response.data.access_token;
+
+                BKStorage.token.set(config.token);
+                BKStorage.user.set(response.data);
+
+                if (self.loginPromise) {
+                    self.loginPromise.resolve(config.token);
+                }
+
+                BackandHttpBufferService.retryAll();
+                $rootScope.$broadcast(EVENTS.SIGNIN);
+
+                if (config.runSocket)
+                    BackandSocketService.login(BKStorage.token.get(), config.anonymousToken, config.appName, config.socketUrl);
+
+
+            } else if (self.loginPromise) {
+                self.loginPromise.reject('token is undefined');
+            }
+            return response.data;
+
+        }).catch(function (err) {
+            if (self.loginPromise) {
+                self.loginPromise.reject(err);
+            }
+            return $q.reject(err.data);
+
+        }).finally(function () {
+            authenticating = false;
+        });
+    }
+
     function mobileSocialLoginInner(ref, isSignUp, provider, spec) {
         ref.addEventListener('loadstart', function (e) {
-            if (e.url.indexOf(dummyReturnAddress) == 0) { // mean startWith
-                ref.close();
+                if (e.url.indexOf(dummyReturnAddress) == 0) { // mean startWith
 
-                // error return from server
-                if (e.url.indexOf('error=') > -1) {
-                    var dataStr = decodeURI(e.url).split('error=')[1];
-                    var userData = JSON.parse(dataStr);
-                    if (!isSignUp && config.callSignupOnSingInSocialError && userData.message.indexOf(NOT_SIGNEDIN_ERROR) > -1) {  // check is right error
-                        socialAuth(provider, true, spec);
+                    try {
+                        ref.close();
+                    }
+                    catch (err) {
+                    }
+
+                    var url = e.url;
+                    // handle case of misformatted json from server
+                    if (url.indexOf('#') === (url.length - 1)) // last char
+                    {
+                        url = url.slice(0, url.length - 1);
+                    }
+
+                    // error return from server
+                    if (url.indexOf('error=') > -1) {
+                        var dataStr = decodeURI(url).split('error=')[1];
+                        var userData = JSON.parse(dataStr);
+                        if (!isSignUp && config.callSignupOnSingInSocialError && userData.message.indexOf(NOT_SIGNEDIN_ERROR) > -1) {  // check is right error
+                            socialAuth(provider, true, spec);
+                            return;
+                        }
+
+                        var rejection = {
+                            data: userData.message + ' (signing in with ' + userData.provider + ')'
+                        };
+
+                        rejection.error_description = rejection.data;
+                        self.loginPromise.reject(rejection);
                         return;
                     }
 
-                    var rejection = {
-                        data: userData.message + ' (signing in with ' + userData.provider + ')'
-                    };
-
-                    rejection.error_description = rejection.data;
-                    self.loginPromise.reject(rejection);
-                    return;
+                    // login is OK
+                    var dataStr = decodeURI(url).split('/#/?data=')[1];
+                    var userData = JSON.parse(dataStr);
+                    if (self.inSocialSignup) {
+                        self.inSocialSignup = false;
+                        $rootScope.$broadcast(EVENTS.SIGNUP);
+                    }
+                    signinWithToken(userData);
                 }
-
-                // login is OK
-                var dataStr = decodeURI(e.url).split('/#/?data=')[1];
-                var userData = JSON.parse(dataStr);
-                if (self.inSocialSignup) {
-                    self.inSocialSignup = false;
-                    $rootScope.$broadcast(EVENTS.SIGNUP);
-                }
-                signinWithToken(userData);
             }
-        });
+        );
     }
 
     function socialAuth(provider, isSignUp, spec, email) {
@@ -254,11 +317,11 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
                 spec || 'left=1, top=1, width=600, height=600');
 
             window.addEventListener('message', (function (provider, spec) {
-                    return function (e) {
-                        window.removeEventListener('message', arguments.callee);
-                        setUserDataFromToken(e, provider, spec)
-                    }
-                })(provider, spec), false);
+                return function (e) {
+                    window.removeEventListener('message', arguments.callee);
+                    setUserDataFromToken(e, provider, spec)
+                }
+            })(provider, spec), false);
         }
         return self.loginPromise.promise;
     }
