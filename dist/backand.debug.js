@@ -646,7 +646,10 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
 
                     // error return from server
                     if (url.indexOf('error=') > -1) {
-                        var dataStr = decodeURI(url).split('error=')[1];
+                        // handle case of strange chars in the end of url on login error
+                        var urlParsed =  new URL(url);
+
+                        var dataStr = decodeURI(urlParsed.search).split('error=')[1];
                         var userData = JSON.parse(dataStr);
                         if (!isSignUp && config.callSignupOnSingInSocialError && userData.message.indexOf(NOT_SIGNEDIN_ERROR) > -1) {  // check is right error
                             socialAuth(provider, true, spec);
