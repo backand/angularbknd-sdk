@@ -1,7 +1,7 @@
 {
   "name": "angularbknd-sdk",
   "description": "Backand SDK for Angular",
-  "version": "1.8.5",
+  "version": "1.8.6",
   "main": [
     "dist/backand.min.js"
   ],

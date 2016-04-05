@@ -309,8 +309,8 @@ angular.module('backand', [])
             };
 
             //Socket.io service
-            self.isRunScoket = function () {
-              return config.runScoket;
+            self.isRunSocket = function () {
+              return config.runSocket;
             };
 
             self.socketLogin = function(){
