@@ -1,10 +1,10 @@
 angular.module('backand')
-    .factory('BackandHttpInterceptor', ['$q', 'Backand', 'BackandHttpBufferService', 'BackandAuthService', HttpInterceptor])
+    .factory('BackandHttpInterceptor', ['$q', '$rootScope', 'Backand', 'BackandHttpBufferService', 'BackandAuthService', HttpInterceptor])
     .config(['$httpProvider', function ($httpProvider) {
         $httpProvider.interceptors.push('BackandHttpInterceptor');
     }]);
 
-function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthService) {
+function HttpInterceptor ($q, $rootScope, Backand, BackandHttpBufferService, BackandAuthService) {
     return {
         request: function(httpConfig) {
             // Exclusions
@@ -35,7 +35,8 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
                 && rejection.data
                 && rejection.data.Message === 'invalid or expired token') {
 
-                    BackandAuthService.refreshToken(Backand.getUsername());
+                    BackandAuthService.refreshToken(Backand.getUsername())
+                        .catch(onRefreshFailed);
 
                     var deferred = $q.defer();
 
@@ -44,6 +45,13 @@ function HttpInterceptor ($q, Backand, BackandHttpBufferService, BackandAuthServ
                 }
 
             return $q.reject(rejection);
+            
+            function onRefreshFailed() {
+                // If refresh has failed, we will not get a new token unless user manually logs in again.
+                // There might be some code in the client application shows a login form in such case
+                // So wee need to notify it
+                $rootScope.$broadcast(EVENTS.TOKEN_EXPIRED);
+            }
         }
     }
 }
