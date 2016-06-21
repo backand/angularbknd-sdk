@@ -388,7 +388,8 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
         var user = BKStorage.user.get();
         var refreshToken;
         if (!user || !(refreshToken = BKStorage.user.get().refresh_token)) {
-            return;
+            // Return promise here for consistency with all return paths
+            return $q.reject('Can\'t refresh token automatically');
         }
 
         var tokenData = {

@@ -18,7 +18,8 @@ var config = {
 var EVENTS = {
     SIGNIN: 'BackandSignIn',
     SIGNOUT: 'BackandSignOut',
-    SIGNUP: 'BackandSignUp'
+    SIGNUP: 'BackandSignUp',
+    TOKEN_EXPIRED: 'BackandTokenExpired'
 };
 
 var socialProviders = {
