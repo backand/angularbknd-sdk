@@ -650,7 +650,9 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
                         var urlParsed =  new URL(url);
 
                         var dataStr = decodeURI(urlParsed.search).split('error=')[1];
+                        dataStr = dataStr.replace(/%3A/g, ':').replace(/%2C/g, ',');
                         var userData = JSON.parse(dataStr);
+                        userData.message = userData.message ? userData.message.replace(/\+/g, ' ') : '';
                         if (!isSignUp && config.callSignupOnSingInSocialError && userData.message.indexOf(NOT_SIGNEDIN_ERROR) > -1) {  // check is right error
                             socialAuth(provider, true, spec);
                             return;
@@ -667,7 +669,9 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
 
                     // login is OK
                     var dataStr = decodeURI(url).split('/#/?data=')[1];
+                    dataStr = dataStr.replace(/%3A/g, ':').replace(/%2C/g, ',');
                     var userData = JSON.parse(dataStr);
+                    userData.message = userData.message ? userData.message.replace(/\+/g, ' ') : '';
                     if (self.inSocialSignup) {
                         self.inSocialSignup = false;
                         $rootScope.$broadcast(EVENTS.SIGNUP);
@@ -684,7 +688,10 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
             throw Error('Unknown Social Provider');
         }
 
-        self.loginPromise = $q.defer();
+        if (!self.loginPromise)
+            self.loginPromise = $q.defer();
+        else
+            self.signUpPromise = $q.defer();
 
         if (config.isMobile) {
 
@@ -819,6 +826,9 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
 
                 if (self.loginPromise) {
                     self.loginPromise.resolve(config.token);
+                }
+                if (self.signUpPromise){
+                    self.signUpPromise.resolve(config.token);
                 }
 
                 BackandHttpBufferService.retryAll();
