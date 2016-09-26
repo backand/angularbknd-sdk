@@ -2,7 +2,7 @@ var http;
 
 var config = {
     apiUrl: 'https://api.backand.com',
-    socketUrl: 'https://api.backand.com:4000',
+    socketUrl: 'https://socket.backand.com',
     anonymousToken: null,
     signUpToken: null,
     isManagingHttpInterceptor: true,

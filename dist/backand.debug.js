@@ -1,3 +1,11 @@
+/*
+ * Angular SDK to use with backand
+ * @version 1.8.10 - 2016-09-26
+ * @link https://www.backand.com
+ * @author Itay Herskovits
+ * @license MIT License, http://www.opensource.org/licenses/MIT
+ */
+
 (function () {
 var BKStorage = (function () {
     'use strict';
@@ -68,7 +76,7 @@ var BKStorage = (function () {
 
 var config = {
     apiUrl: 'https://api.backand.com',
-    socketUrl: 'https://api.backand.com:4000',
+    socketUrl: 'https://socket.backand.com',
     anonymousToken: null,
     signUpToken: null,
     isManagingHttpInterceptor: true,
