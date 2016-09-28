@@ -28,11 +28,15 @@ var socialProviders = {
     twitter: {name: 'twitter', label: 'Twitter', url: 'www.twitter.com', css: 'twitter', id: 4}
 };
 
-function getSocialUrl(providerName, isSignup) {
+function getSocialUrl(providerName, isSignup, isAutoSignUp) {
     var provider = socialProviders[providerName];
     var action = isSignup ? 'up' : 'in';
+    var autoSignUpParam = '';
+    if (!isSignup && isAutoSignUp) {
+        autoSignUpParam = "&signupIfNotSignedIn=true";
+    }
     return 'user/socialSign' + action +
-        '?provider=' + provider.label +
+        '?provider=' + provider.label + autoSignUpParam +
         '&response_type=token&client_id=self&redirect_uri=' + provider.url +
         '&state=';
 }
