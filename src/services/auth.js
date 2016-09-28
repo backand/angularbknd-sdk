@@ -196,7 +196,7 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
         }
 
         var url = config.apiUrl + urls.socialLoginWithToken.replace('PROVIDER', provider) + "?accessToken=" + encodeURIComponent(token) + "&appName=" + encodeURI(config.appName);
-        if (isSignUp) {
+        if (isAutoSignUp) {
             url = url + "&signupIfNotSignedIn=true";
         }
         console.log(url);
@@ -297,7 +297,7 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
         );
     }
 
-    function socialAuth(provider, isSignUp, spec, email) {
+    function socialAuth(provider, isSignUp, spec, email, isAutoSignUp) {
 
         if (!socialProviders[provider]) {
             throw Error('Unknown Social Provider');
