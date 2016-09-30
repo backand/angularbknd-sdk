@@ -1,3 +1,11 @@
+/*
+ * Angular SDK to use with backand
+ * @version 1.8.11 - 2016-09-30
+ * @link https://www.backand.com
+ * @author Itay Herskovits
+ * @license MIT License, http://www.opensource.org/licenses/MIT
+ */
+
 (function () {
 var BKStorage = (function () {
     'use strict';
