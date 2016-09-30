@@ -99,8 +99,8 @@ angular.module('backand', [])
                 return socialProviders;
             };
 
-            self.socialSignin = function (provider, spec) {
-                return BackandAuthService.socialSignin(provider, spec)
+            self.socialSignin = function (provider, spec, isAutoSignUp) {
+                return BackandAuthService.socialSignin(provider, spec, isAutoSignUp)
             };
 
             self.socialSignup = function (provider, parameters, spec, email) {
@@ -109,7 +109,11 @@ angular.module('backand', [])
 
             self.socialSignInToken = function(provider, token){
                 return BackandAuthService.socialSigninWithToken(provider, token)
-            }
+            };
+
+            self.socialSignUpToken = function (provider, token) {
+                return BackandAuthService.socialSigninWithToken(provider, token, true)
+            };
 
             self.socialSignInCode = function(provider, code){
                 var returnUrl = window.location.origin;

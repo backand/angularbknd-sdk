@@ -67,8 +67,8 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
     };
 
     // social authentication
-    self.socialSignin = function (provider, spec) {
-        return socialAuth(provider, false, spec);
+    self.socialSignin = function (provider, spec, isAutoSignUp) {
+        return socialAuth(provider, false, spec, null, isAutoSignUp);
     };
 
     self.socialSignup = function (provider, parameters, spec, email) {
@@ -190,12 +190,15 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
         })
     }
 
-    self.socialSigninWithToken = function (provider, token) {
+    self.socialSigninWithToken = function (provider, token, isAutoSignUp) {
         if (authenticating) {
             return;
         }
 
         var url = config.apiUrl + urls.socialLoginWithToken.replace('PROVIDER', provider) + "?accessToken=" + encodeURIComponent(token) + "&appName=" + encodeURI(config.appName);
+        if (isAutoSignUp) {
+            url = url + "&signupIfNotSignedIn=true";
+        }
         console.log(url);
         authenticating = true;
         BKStorage.token.clear();
@@ -237,7 +240,7 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
         }).finally(function () {
             authenticating = false;
         });
-    }
+    };
 
     function mobileSocialLoginInner(ref, isSignUp, provider, spec) {
         ref.addEventListener('loadstart', function (e) {
@@ -294,7 +297,7 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
         );
     }
 
-    function socialAuth(provider, isSignUp, spec, email) {
+    function socialAuth(provider, isSignUp, spec, email, isAutoSignUp) {
 
         if (!socialProviders[provider]) {
             throw Error('Unknown Social Provider');
@@ -309,7 +312,7 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
 
             var ref = window.open(
                 config.apiUrl + '/1/'
-                + getSocialUrl(provider, isSignUp)
+                + getSocialUrl(provider, isSignUp, isAutoSignUp)
                 + '&appname=' + config.appName + (email ? ("&email=" + email) : '')
                 + '&returnAddress=' + dummyReturnAddress,
                 'id1',
@@ -320,7 +323,7 @@ function BackandAuthService($q, $rootScope, BackandHttpBufferService, BackandSoc
         else {
             self.socialAuthWindow = window.open(
                 config.apiUrl + '/1/'
-                + getSocialUrl(provider, isSignUp)
+                + getSocialUrl(provider, isSignUp, isAutoSignUp)
                 + '&appname=' + config.appName + (email ? ("&email=" + email) : '')
                 + '&returnAddress=',
                 'id1',
