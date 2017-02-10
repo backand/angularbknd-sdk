@@ -1,4 +1,6 @@
 # angularbknd-sdk
+###**NOTE - This SDK is deprecated, please use our new SDK at https://github.com/backand/vanilla-sdk**
+
 Backand SDK for Angular
 
 Install:
